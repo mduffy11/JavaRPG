@@ -1,0 +1,87 @@
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+::                DARK HOLDS - BESTIARY                  ::
+::                  FLOOR 1 PROTOTYPE                    ::
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+[ COMBAT LAW ]
+
+Enemy move power is not direct damage by itself.
+
+Formula:
+    damage = max(1, movePower + enemyAttack - playerDefense)
+
+Exceptions:
+    * Pocket Sand = 1 damage
+    * Constrict = normal hit + 2 damage per trapped turn
+
+
++--------------------------------------------------------+
+| GOBLIN                                                 |
++--------------------------------------------------------+
+| HP: 20   ATK: 5   DEF: 2   XP: 10   GOLD: 4-8         |
++--------------------------------------------------------+
+| Knife Stab   | Power 2 | Acc 78 | Effect: None        |
+| Wild Swing   | Power 4 | Acc 55 | Effect: None        |
+| Pocket Sand  | Power 0 | Acc 50 | Effect: Sand        |
+|              | Effect Chance: 50%                     |
++--------------------------------------------------------+
+| Special: Next player offensive move may have           |
+|          its accuracy cut in half.                     |
++--------------------------------------------------------+
+
++--------------------------------------------------------+
+| BATS                                                   |
++--------------------------------------------------------+
+| HP: 14   ATK: 4   DEF: 1   XP: 8    GOLD: 1-4         |
++--------------------------------------------------------+
+| Bite         | Power 1 | Acc 80 | Effect: None        |
+| Screech      | Power 2 | Acc 72 | Effect: None        |
++--------------------------------------------------------+
+| Special: None                                         |
++--------------------------------------------------------+
+
++--------------------------------------------------------+
+| WOLF                                                   |
++--------------------------------------------------------+
+| HP: 24   ATK: 6   DEF: 2   XP: 12   GOLD: 4-7         |
++--------------------------------------------------------+
+| Bite         | Power 2 | Acc 78 | Effect: None        |
+| Pounce       | Power 5 | Acc 52 | Effect: None        |
++--------------------------------------------------------+
+| Special: None                                         |
++--------------------------------------------------------+
+
++--------------------------------------------------------+
+| SLIME                                                  |
++--------------------------------------------------------+
+| HP: 42   ATK: 4   DEF: 5   XP: 16   GOLD: 8-15        |
++--------------------------------------------------------+
+| Slam         | Power 2 | Acc 74 | Effect: None        |
+| Acid Splash  | Power 3 | Acc 68 | Effect: None        |
++--------------------------------------------------------+
+| Special: Stick Attack only does 2 damage.             |
+|          Torch is the intended counter.               |
++--------------------------------------------------------+
+
++--------------------------------------------------------+
+| GIANT SNAKE                                            |
++--------------------------------------------------------+
+| HP: 34   ATK: 8   DEF: 3   XP: 28   GOLD: 15-25       |
++--------------------------------------------------------+
+| Bite         | Power 3 | Acc 76 | Effect: None        |
+| Tail Lash    | Power 5 | Acc 52 | Effect: None        |
+| Constrict    | Power 2 | Acc 60 | Effect: Constrict   |
++--------------------------------------------------------+
+| Special: Constrict skips player turns and deals       |
+|          ongoing damage while active.                 |
++--------------------------------------------------------+
+
+[ CURRENT STATUS EFFECTS ]
+
+Pocket Sand
+    Source : Goblin
+    Effect : Halves next player offensive accuracy
+
+Constrict
+    Source : Giant Snake
+    Effect : Skips turns and deals ongoing damage
