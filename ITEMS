@@ -1,0 +1,193 @@
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+::                 DARK HOLDS - CURRENT ITEM INDEX        ::
+::                  FLOOR 1 PROTOTYPE                     ::
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+[ ITEM NOTES ]
+
+Only a few items are currently implemented in the current prototype.
+Some are fully functional.
+Some are reward / progression items.
+Some are placeholders for future floors.
+
+Combat-related item behavior currently exists for:
+    * Stick
+    * Torch
+    * Small Potion
+
+Non-combat / progression items currently include:
+    * Iron Key
+    * Ancient Relic
+    * Gold
+
+
++--------------------------------------------------------+
+| STICK                                                  |
++--------------------------------------------------------+
+| Type: Weapon                                           |
+| Start Item: Yes                                        |
+| Found In: Player starting inventory                    |
++--------------------------------------------------------+
+| Combat Use: Yes                                        |
+| Attack Name : Stick Attack                             |
+| Power       : 2                                        |
+| Accuracy    : 95%                                      |
++--------------------------------------------------------+
+| Notes:                                                 |
+| - This is the player's default weapon.                 |
+| - It is always available from the start.               |
+| - Against most enemies it uses the normal damage rule. |
+| - Against Slime it only deals 2 damage total.          |
++--------------------------------------------------------+
+
+
++--------------------------------------------------------+
+| TORCH                                                  |
++--------------------------------------------------------+
+| Type: Weapon                                           |
+| Start Item: No                                         |
+| Found In: Guaranteed somewhere before the locked hall  |
++--------------------------------------------------------+
+| Combat Use: Yes                                        |
+| Attack Name : Torch                                    |
+| Power       : 4                                        |
+| Accuracy    : 80%                                      |
++--------------------------------------------------------+
+| Notes:                                                 |
+| - Torch does NOT appear on the battle menu until found |
+| - It is stronger than Stick, but less accurate.        |
+| - It is the intended counter to Slime.                 |
+| - Against Slime, Torch damage is heavily boosted.      |
++--------------------------------------------------------+
+
+
++--------------------------------------------------------+
+| SMALL POTION                                           |
++--------------------------------------------------------+
+| Type: Healing                                          |
+| Start Item: No                                         |
+| Found In: Random pre-lock rooms                        |
+| Guaranteed Count: At least 3 on Floor 1                |
++--------------------------------------------------------+
+| Combat Use: Yes                                        |
+| Out-of-Combat Use: Yes                                 |
+| Healing Power : 15 HP                                  |
+| Accuracy      : N/A                                    |
++--------------------------------------------------------+
+| Notes:                                                 |
+| - Restores 15 HP.                                      |
+| - Can be used from the inventory menu in battle.       |
+| - Can also be used outside battle from inventory.      |
+| - Consumed on use.                                     |
++--------------------------------------------------------+
+
+
++--------------------------------------------------------+
+| IRON KEY                                               |
++--------------------------------------------------------+
+| Type: Progression Item                                 |
+| Start Item: No                                         |
+| Found In: One random key-eligible pre-lock room        |
++--------------------------------------------------------+
+| Combat Use: No                                         |
+| Power       : N/A                                      |
+| Accuracy    : N/A                                      |
++--------------------------------------------------------+
+| Notes:                                                 |
+| - Required to open the locked hallway.                 |
+| - Can never appear behind the locked route.            |
+| - If it is in a room with an enemy, it is only         |
+|   revealed after the room is cleared.                  |
++--------------------------------------------------------+
+
+
++--------------------------------------------------------+
+| ANCIENT RELIC                                          |
++--------------------------------------------------------+
+| Type: Special                                          |
+| Start Item: No                                         |
+| Found In: Snake Hoard                                  |
++--------------------------------------------------------+
+| Combat Use: No                                         |
+| Power       : 0                                        |
+| Accuracy    : N/A                                      |
++--------------------------------------------------------+
+| Notes:                                                 |
+| - This is currently a placeholder reward item.         |
+| - It has no battle function yet.                       |
+| - It mainly exists as a prototype reward / treasure.   |
++--------------------------------------------------------+
+
+
++--------------------------------------------------------+
+| GOLD                                                   |
++--------------------------------------------------------+
+| Type: Resource / Currency                              |
+| Start Amount: 0                                        |
+| Found In: Rooms, treasure caches, enemy rewards        |
++--------------------------------------------------------+
+| Combat Use: No                                         |
+| Power       : N/A                                      |
+| Accuracy    : N/A                                      |
++--------------------------------------------------------+
+| Notes:                                                 |
+| - Gold is collected directly, not used as an attack.   |
+| - Different rooms and enemies award different amounts. |
+| - Snake Hoard gives a large extra gold reward.         |
+| - Gold matters more later once merchant systems grow.  |
++--------------------------------------------------------+
+
+
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+::                QUICK ITEM SUMMARY                     ::
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+Stick
+  Type: Weapon
+  Use : Default attack
+  Power 2 | Accuracy 95%
+  Special: Only does 2 damage to Slime
+
+Torch
+  Type: Weapon
+  Use : Alternate attack after being found
+  Power 4 | Accuracy 80%
+  Special: Strong counter to Slime
+
+Small Potion
+  Type: Healing
+  Use : Restores 15 HP
+  Combat Use: Yes
+  Field Use : Yes
+
+Iron Key
+  Type: Progression
+  Use : Opens locked hallway
+
+Ancient Relic
+  Type: Special / Reward
+  Use : Placeholder treasure item for now
+
+Gold
+  Type: Currency
+  Use : Resource collected from rooms and enemies
+
+
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+::              CURRENTLY IMPLEMENTED ITEMS              ::
+::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+[ Functional in battle ]
+- Stick
+- Torch
+- Small Potion
+
+[ Functional outside battle ]
+- Small Potion
+
+[ Functional for progression ]
+- Iron Key
+
+[ Reward / placeholder ]
+- Ancient Relic
+- Gold
