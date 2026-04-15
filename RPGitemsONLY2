@@ -1,0 +1,565 @@
+import java.util.ArrayList;
+
+/**
+ * RPGItemsOnly.java
+ * --------------------------------
+ * Item-only support file adapted to match the current
+ * Dark Holds prototype structure 4/14/26.
+ *
+ * IMPORTANT:
+ * - This file does NOT replace the main game file.
+ * - It is meant to be game's item module / item reference layer.
+ * - It follows duffy's current code style so he or someone else can later
+ *   connect his battle / room / inventory code to these classes.
+ *
+ * This file assumes the project already has:
+ * - Item
+ * - ItemType
+ * - Player
+ * - Enemy
+ * - EnemyType
+ *
+ * from the main prototype file.
+ */
+
+/* =========================
+   HELPER / COMPATIBILITY
+   ========================= */
+
+class ItemContext {
+    private boolean inBattle;
+    private Enemy currentEnemy;
+    private String previousRoomId;
+    private String currentRoomId;
+    private boolean stealthActive;
+
+    public boolean isInBattle() {
+        return inBattle;
+    }
+
+    public void setInBattle(boolean inBattle) {
+        this.inBattle = inBattle;
+    }
+
+    public Enemy getCurrentEnemy() {
+        return currentEnemy;
+    }
+
+    public void setCurrentEnemy(Enemy currentEnemy) {
+        this.currentEnemy = currentEnemy;
+    }
+
+    public String getPreviousRoomId() {
+        return previousRoomId;
+    }
+
+    public void setPreviousRoomId(String previousRoomId) {
+        this.previousRoomId = previousRoomId;
+    }
+
+    public String getCurrentRoomId() {
+        return currentRoomId;
+    }
+
+    public void setCurrentRoomId(String currentRoomId) {
+        this.currentRoomId = currentRoomId;
+    }
+
+    public boolean isStealthActive() {
+        return stealthActive;
+    }
+
+    public void setStealthActive(boolean stealthActive) {
+        this.stealthActive = stealthActive;
+    }
+}
+
+/* =========================
+   BASE ITEM CLASSES
+   ========================= */
+
+abstract class GameItem extends Item {
+    private final String description;
+
+    public GameItem(String name, ItemType type, int power, String description) {
+        super(name, type, power);
+        this.description = description;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    /**
+     * Returns true if consumed on use.
+     * This is not part of the prototype's base Item class,
+     * so this file provides it separately for later integration.
+     */
+    public boolean use(Player player, ItemContext context) {
+        System.out.println(getName() + " has no active use yet.");
+        return false;
+    }
+
+    @Override
+    public String toString() {
+        return getName() + " - " + description;
+    }
+}
+
+abstract class WeaponItem extends GameItem {
+    private final int accuracy;
+    private final String attackName;
+
+    public WeaponItem(String name, int power, int accuracy, String attackName, String description) {
+        super(name, ItemType.WEAPON, power, description);
+        this.accuracy = accuracy;
+        this.attackName = attackName;
+    }
+
+    public int getAccuracy() {
+        return accuracy;
+    }
+
+    public String getAttackName() {
+        return attackName;
+    }
+
+    public int getDamageAgainst(Enemy enemy, Player player) {
+        if (enemy == null) {
+            return getPower();
+        }
+
+        return Math.max(1, getPower() + player.getAttack() - enemy.getDefense());
+    }
+}
+
+/* =========================
+   POTIONS
+   ========================= */
+
+class SmallHealthPotion extends GameItem {
+    private static final int HEAL_AMOUNT = 15;
+
+    public SmallHealthPotion() {
+        super(
+                "Small Potion",
+                ItemType.HEALING,
+                HEAL_AMOUNT,
+                "Heals 15 HP. Can be used in or out of battle. Cannot heal above max HP."
+        );
+    }
+
+    @Override
+    public boolean use(Player player, ItemContext context) {
+        int before = player.getHp();
+        player.heal(HEAL_AMOUNT);
+        int healed = player.getHp() - before;
+        System.out.println("Used Small Potion. Restored " + healed + " HP.");
+        return true;
+    }
+}
+
+class BigHealthPotion extends GameItem {
+    private static final int HEAL_AMOUNT = 40;
+
+    public BigHealthPotion() {
+        super(
+                "Big Potion",
+                ItemType.HEALING,
+                HEAL_AMOUNT,
+                "Heals 40 HP. Can be used in or out of battle. Cannot heal above max HP."
+        );
+    }
+
+    @Override
+    public boolean use(Player player, ItemContext context) {
+        int before = player.getHp();
+        player.heal(HEAL_AMOUNT);
+        int healed = player.getHp() - before;
+        System.out.println("Used Big Potion. Restored " + healed + " HP.");
+        return true;
+    }
+}
+
+/* =========================
+   SCROLLS
+   ========================= */
+
+class ScrollOfEscape extends GameItem {
+    public ScrollOfEscape() {
+        super(
+                "Scroll of Escape",
+                ItemType.SPECIAL,
+                0,
+                "Use during battle to escape back to the previous room."
+        );
+    }
+
+    @Override
+    public boolean use(Player player, ItemContext context) {
+        if (context == null || !context.isInBattle()) {
+            System.out.println("Scroll of Escape can only be used during battle.");
+            return false;
+        }
+
+        if (context.getPreviousRoomId() == null) {
+            System.out.println("No previous room exists.");
+            return false;
+        }
+
+        player.setCurrentRoom(context.getPreviousRoomId());
+        context.setCurrentRoomId(context.getPreviousRoomId());
+        context.setCurrentEnemy(null);
+        context.setInBattle(false);
+
+        System.out.println("You used Scroll of Escape and fled to the previous room.");
+        return true;
+    }
+}
+
+class ScrollOfFireball extends GameItem {
+    private static final int FIREBALL_DAMAGE = 35;
+
+    public ScrollOfFireball() {
+        super(
+                "Scroll of Fireball",
+                ItemType.SPECIAL,
+                FIREBALL_DAMAGE,
+                "One-time use. Deals 35 damage to the current enemy in battle."
+        );
+    }
+
+    @Override
+    public boolean use(Player player, ItemContext context) {
+        if (context == null || !context.isInBattle() || context.getCurrentEnemy() == null) {
+            System.out.println("Scroll of Fireball can only be used during battle.");
+            return false;
+        }
+
+        context.getCurrentEnemy().takeDamage(FIREBALL_DAMAGE);
+        System.out.println("Fireball hits " + context.getCurrentEnemy().getName()
+                + " for " + FIREBALL_DAMAGE + " damage.");
+        return true;
+    }
+}
+
+class ScrollOfStealth extends GameItem {
+    public ScrollOfStealth() {
+        super(
+                "Scroll of Stealth",
+                ItemType.SPECIAL,
+                0,
+                "Use before battle to bypass the next non-boss fight. Can also support dragon-lair stealth events later."
+        );
+    }
+
+    @Override
+    public boolean use(Player player, ItemContext context) {
+        if (context == null) {
+            System.out.println("Stealth cannot be applied without battle/room context.");
+            return false;
+        }
+
+        if (context.isInBattle()) {
+            System.out.println("Scroll of Stealth must be used before battle starts.");
+            return false;
+        }
+
+        if (context.getCurrentEnemy() != null && context.getCurrentEnemy().getType() == EnemyType.SNAKE) {
+            System.out.println("Scroll of Stealth cannot bypass a boss encounter.");
+            return false;
+        }
+
+        context.setStealthActive(true);
+        System.out.println("Stealth activated. The next non-boss encounter may be bypassed.");
+        return true;
+    }
+}
+
+/* =========================
+   WEAPONS
+   ========================= */
+
+class Stick extends WeaponItem {
+    public Stick() {
+        super(
+                "Stick",
+                2,
+                95,
+                "Stick Attack",
+                "Default weapon. Power 2. Accuracy 95%. Against Slime it only deals 2 damage total."
+        );
+    }
+
+    @Override
+    public int getDamageAgainst(Enemy enemy, Player player) {
+        if (enemy != null && enemy.getType() == EnemyType.SLIME) {
+            return 2;
+        }
+
+        return Math.max(1, getPower() + player.getAttack() - enemy.getDefense());
+    }
+}
+
+class Sword extends WeaponItem {
+    public Sword() {
+        super(
+                "Sword",
+                8,
+                90,
+                "Sword Slash",
+                "Stronger weapon. Power 8. Accuracy 90%."
+        );
+    }
+}
+
+class Torch extends WeaponItem {
+    public Torch() {
+        super(
+                "Torch",
+                4,
+                80,
+                "Torch",
+                "Weapon and utility item. Power 4. Accuracy 80%. Also allows entry into dark rooms. Strong against Slime."
+        );
+    }
+
+    @Override
+    public int getDamageAgainst(Enemy enemy, Player player) {
+        if (enemy != null && enemy.getType() == EnemyType.SLIME) {
+            return Math.max(10, getPower() + player.getAttack() - enemy.getDefense() + 6);
+        }
+
+        return Math.max(1, getPower() + player.getAttack() - enemy.getDefense());
+    }
+}
+
+/* =========================
+   ARMOR / SHIELD
+   ========================= */
+
+class Armor extends GameItem {
+    private final int defenseBonus = 6;
+
+    public Armor() {
+        super(
+                "Armor",
+                ItemType.SPECIAL,
+                0,
+                "Body equipment. Defense bonus +6."
+        );
+    }
+
+    public int getDefenseBonus() {
+        return defenseBonus;
+    }
+}
+
+class Shield extends GameItem {
+    private final int defenseBonus = 3;
+
+    public Shield() {
+        super(
+                "Shield",
+                ItemType.SPECIAL,
+                0,
+                "Hand equipment. +3 Defense. Enables Parry against heavy attacks."
+        );
+    }
+
+    public int getDefenseBonus() {
+        return defenseBonus;
+    }
+
+    /**
+     * Lets battle code know this item enables the Parry action.
+     * Your friend can check this when building the action menu.
+     */
+    public boolean enablesParry() {
+        return true;
+    }
+
+    /**
+     * Main parry mechanic.
+     *
+     * How it works:
+     * - If the enemy attack misses, parry does nothing.
+     * - If the enemy attack is LIGHT, parry fails and returns 0.
+     * - If the enemy attack is HEAVY and it hits, damage is redirected
+     *   back to the enemy instead of hurting the player.
+     *
+     * Parameters:
+     * attackType    -> later your friend can pass "light" or "heavy"
+     * hitLands      -> true if enemy accuracy check succeeded
+     * enemyAttack   -> enemy base attack stat
+     * movePower     -> enemy move power
+     * playerDefense -> player's current defense
+     *
+     * Returns:
+     * - reflected damage if parry succeeds
+     * - 0 if parry fails or the attack misses
+     */
+    public int parryDamage(String attackType, boolean hitLands,
+                           int enemyAttack, int movePower, int playerDefense) {
+
+        if (!hitLands || attackType == null) {
+            return 0;
+        }
+
+        if (attackType.equalsIgnoreCase("heavy")) {
+            return Math.max(1, enemyAttack + movePower - playerDefense);
+        }
+
+        return 0;
+    }
+
+    /**
+     * Optional helper for battle text.
+     */
+    public String getParryResultMessage(String attackType, boolean hitLands, int reflectedDamage) {
+        if (!hitLands) {
+            return "The enemy attack missed, so parry was not needed.";
+        }
+
+        if (attackType == null) {
+            return "Parry failed.";
+        }
+
+        if (attackType.equalsIgnoreCase("heavy") && reflectedDamage > 0) {
+            return "Parry successful! You redirect the heavy attack and deal "
+                    + reflectedDamage + " damage back to the enemy.";
+        }
+
+        return "Parry failed. Light attacks cannot be parried.";
+    }
+
+    /**
+     * Optional helper for action-menu logic.
+     * Assuming your friend already supports equipped shield checking,
+     * this makes the shield responsible for exposing the parry action.
+     */
+    public String getBattleActionName() {
+        return "Parry";
+    }
+}
+
+/* =========================
+   SPECIAL / UTILITY
+   ========================= */
+
+class Key extends GameItem {
+    private final String keyId;
+
+    public Key(String keyId) {
+        super(
+                "Key",
+                ItemType.SPECIAL,
+                0,
+                "Used to open locked rooms or doors. Key ID: " + keyId
+        );
+        this.keyId = keyId;
+    }
+
+    public String getKeyId() {
+        return keyId;
+    }
+}
+
+class AncientRelic extends GameItem {
+    public AncientRelic() {
+        super(
+                "Ancient Relic",
+                ItemType.SPECIAL,
+                0,
+                "Placeholder reward item. No active function yet."
+        );
+    }
+}
+
+class BookOfSpells extends GameItem {
+    private final ArrayList<String> storedSpells;
+
+    public BookOfSpells() {
+        super(
+                "Book of Spells",
+                ItemType.SPECIAL,
+                0,
+                "Placeholder item. Planned to store learned spells for repeated use later."
+        );
+        storedSpells = new ArrayList<>();
+    }
+
+    public void addSpell(String spellName) {
+        storedSpells.add(spellName);
+    }
+
+    public ArrayList<String> getStoredSpells() {
+        return storedSpells;
+    }
+
+    @Override
+    public boolean use(Player player, ItemContext context) {
+        System.out.println("Book of Spells is not finished yet.");
+        return false;
+    }
+}
+
+/* =========================
+   OPTIONAL HELPER METHODS
+   ========================= */
+
+class ItemSupport {
+
+    public static boolean playerHasTorch(Player player) {
+        for (Item item : player.getInventory()) {
+            if (item instanceof Torch || item.getName().equalsIgnoreCase("Torch")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static boolean playerHasKey(Player player, String keyId) {
+        for (Item item : player.getInventory()) {
+            if (item instanceof Key) {
+                Key key = (Key) item;
+                if (key.getKeyId().equalsIgnoreCase(keyId)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    public static WeaponItem getWeaponByName(Player player, String weaponName) {
+        for (Item item : player.getInventory()) {
+            if (item instanceof WeaponItem && item.getName().equalsIgnoreCase(weaponName)) {
+                return (WeaponItem) item;
+            }
+        }
+        return null;
+    }
+
+    public static boolean useInventoryItem(Player player, int index, ItemContext context) {
+        if (index < 0 || index >= player.getInventory().size()) {
+            System.out.println("Invalid item index.");
+            return false;
+        }
+
+        Item rawItem = player.getInventory().get(index);
+
+        if (!(rawItem instanceof GameItem)) {
+            System.out.println(rawItem.getName() + " is still using the old item format.");
+            return false;
+        }
+
+        GameItem item = (GameItem) rawItem;
+        boolean consumed = item.use(player, context);
+
+        if (consumed) {
+            player.removeItem(index);
+        }
+
+        return consumed;
+    }
+}
