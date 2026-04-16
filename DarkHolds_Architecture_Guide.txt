@@ -1,0 +1,186 @@
+
+DARK HOLDS PROTOTYPE - ITEM AND ROOM STRUCTURE GUIDE
+====================================================
+
+This text guide matches the section comments and method comments in the refactored Java file.
+
+SECTION 1 - GAME FLOW AND MAIN LOOP
+-----------------------------------
+Relevant code header:
+SECTION 1 - GAME FLOW AND MAIN LOOP
+
+Purpose:
+This section controls the overall flow of the prototype.
+
+Important methods:
+- introStory()
+  Shows the opening text and creates the player.
+- setupGame()
+  Builds the room map, distributes guaranteed rewards, and places the player in the safe room.
+- distributeGuaranteedLoot()
+  Places the key, torch, potions, and relic into valid rooms.
+- gameLoop()
+  Runs the main room-by-room cycle until victory or death.
+- showPlayerStatus()
+  Prints HP, stats, gold, level, XP, and whether the player has any key.
+- revealRoomRewards(Room room)
+  Gives the player gold, keys, and reward items once a room is safe.
+- promptBeforeBattle(Room room)
+  Lets the player fight or back away before combat starts.
+- handleRoomChoices(Room current)
+  Displays room exits and the overworld inventory option.
+- openInventoryMenu()
+  Handles item use outside battle.
+
+Item behavior in this section:
+- Reward items are now created through the DarkHoldsItems helper methods.
+- The floor-one key is now modeled as a real KeyItem object.
+- To preserve current prototype behavior, keys are stored in the player's key collection instead of the normal visible inventory list.
+
+SECTION 2 - WORLD GENERATION AND ROOM LAYOUT
+--------------------------------------------
+Relevant code header:
+SECTION 2 - WORLD GENERATION AND ROOM LAYOUT
+
+Purpose:
+This section builds the first floor and defines how rooms are connected.
+
+Important methods:
+- createFloorOne(Random random)
+  Creates all named rooms and all permanent room links.
+- createGoblinMiddleRoom(Random random)
+  Rolls the variable middle goblin room.
+- createOptionalRoom(Random random, String id)
+  Rolls each optional room from a weighted list.
+- createGoblinEnemy(), createBatEnemy(), createWolfEnemy(), createSlimeEnemy(), createSnakeEnemy()
+  Create the enemy objects used by rooms.
+- connect(Room a, Room b)
+  Creates a two-way room connection.
+
+Room code behavior:
+- Main route rooms are created first.
+- Optional rooms are created afterward and connected to shuffled anchor rooms.
+- Pre-lock flags and key-eligible flags decide which rooms can receive the guaranteed key or other rewards.
+- Reward placement is not hardcoded inside room creation. It is done later in Game.distributeGuaranteedLoot().
+
+SECTION 3 - COMBAT FLOW, ENEMY DATA, AND TURN RESULTS
+-----------------------------------------------------
+Relevant code header:
+SECTION 3 - COMBAT FLOW, ENEMY DATA, AND TURN RESULTS
+
+Purpose:
+This section runs battles and contains enemy-related combat data.
+
+Important methods:
+- handleBattle(Player player, Room room)
+  Runs one full combat encounter.
+- promptPlayerAction(Player player)
+  Prints the current combat menu.
+- playerBasicAttack(...)
+  Runs Stick Attack using the new item architecture but preserves existing output and behavior.
+- playerTorchAttack(...)
+  Runs Torch attack using the new item architecture but preserves existing output and behavior.
+- openActionMenu()
+  Handles the Action submenu, which currently contains Dodge.
+- useItemInBattle(...)
+  Handles battle inventory choices.
+- tryRun(Player player)
+  Attempts to escape.
+- calculatePlayerDamage(...)
+  Calculates standard player damage.
+- calculateEnemyDamage(...)
+  Calculates standard enemy damage and includes the Pocket Sand exception.
+
+Combat behavior preserved:
+- Stick Attack still exists as the default attack.
+- Torch still appears as a separate action only when found.
+- Selecting Stick or Torch from the inventory during battle still duplicates their combat actions.
+- Invalid item choices still do not consume the player's turn.
+- Dodge still always works on the next enemy move.
+- Run still returns to the previous room on success.
+
+SECTION 4 - PLAYER STATE AND ROOM DATA
+--------------------------------------
+Relevant code header:
+SECTION 4 - PLAYER STATE AND ROOM DATA
+
+Purpose:
+This section stores player stats, inventory, keys, room state, and room rewards.
+
+Player notes:
+- inventory stores normal carried items.
+- keys stores KeyItem objects separately.
+- getAttack() and getDefense() now include passive item bonuses automatically.
+- The current prototype does not place armor or shield rewards yet, but the support is already present.
+
+Room notes:
+- Each room stores description, cleared description, neighbors, enemy, gold reward, item rewards, and key reward state.
+- hasBeenCleared() returns true when the room's enemy is defeated or its rewards were already collected.
+
+SECTION 5 - ITEM ARCHITECTURE, ITEM HELPERS, AND ITEM TYPES
+-----------------------------------------------------------
+Relevant code header:
+SECTION 5 - ITEM ARCHITECTURE, ITEM HELPERS, AND ITEM TYPES
+
+Purpose:
+This section integrates the richer item design directly into the prototype.
+
+Main classes:
+- DarkHoldsItems
+  Factory and helper class for creating and checking item objects.
+- ItemContext
+  Small context object passed into usable items.
+- Item
+  Base class with name, type, and power.
+- GameItem
+  Richer item base class for items that need behavior.
+- WeaponItem
+  Subclass for attack-capable items like Stick, Sword, and Torch.
+- PassiveGearItem
+  Subclass for passive bonuses like Armor and Shield.
+
+Item subsections:
+- POTIONS
+  SmallPotionItem and BigPotionItem heal the player and are consumed on use.
+- SCROLLS
+  ScrollOfEscapeItem, ScrollOfFireballItem, and ScrollOfStealthItem support battle or overworld effects.
+- WEAPONS
+  StickItem, SwordItem, and TorchItem define power, accuracy, and special rules.
+- PASSIVE GEAR
+  ArmorItem and ShieldItem support automatic passive stat bonuses.
+- KEYS AND SPECIALS
+  KeyItem, AncientRelicItem, and BookOfSpellsItem handle special inventory cases and future expansion.
+
+How the item architecture is reconciled with the prototype:
+- The prototype still uses a simple inventory list of Item objects.
+- Richer items subclass Item only when extra behavior is needed.
+- This keeps the code close to the original prototype style while allowing future growth.
+- Current prototype functionality is preserved because the battle menu and room loop still behave the same as before.
+
+WHAT ANOTHER TEAMMATE SHOULD KNOW ABOUT ROOMS
+---------------------------------------------
+If someone else is restructuring room generation, the safest places to work are:
+- createFloorOne(Random random)
+- createGoblinMiddleRoom(Random random)
+- createOptionalRoom(Random random, String id)
+- connect(Room a, Room b)
+
+They should avoid changing:
+- Game.distributeGuaranteedLoot()
+  unless reward distribution itself is being redesigned
+- BattleManager
+  because combat depends on the room enemy references staying valid
+- Room reward fields
+  because revealRoomRewards() depends on them
+
+WHAT ANOTHER TEAMMATE SHOULD KNOW ABOUT ITEMS
+---------------------------------------------
+If someone else is expanding items, the safest places to work are:
+- DarkHoldsItems factory methods
+- GameItem subclasses in SECTION 5
+- Player.getAttack() and Player.getDefense() only if passive gear logic changes
+- BattleManager.promptPlayerAction() if new weapon actions should become direct menu options
+- BattleManager.useItemInBattle() if new usable inventory items need battle behavior
+
+Summary:
+This refactor keeps the prototype playable in the same way while giving the item system better structure and making the room-generation code easier to isolate for future work.
