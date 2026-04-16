@@ -710,19 +710,37 @@ class BattleManager {
                 }
             }
 
-            PlayerAction action = promptPlayerAction(player);
+            boolean actionResolved = false;
+            boolean dodgeActive = false;
 
-            if (action == PlayerAction.ATTACK) {
-                sandInEyes = playerBasicAttack(player, enemy, sandInEyes);
-            } else if (action == PlayerAction.TORCH) {
-                sandInEyes = playerTorchAttack(player, enemy, sandInEyes);
-            } else if (action == PlayerAction.ITEM) {
-                useItemInBattle(player);
-            } else if (action == PlayerAction.RUN) {
-                boolean escaped = tryRun(player);
+            while (!actionResolved) {
+                PlayerAction action = promptPlayerAction(player);
 
-                if (escaped) {
-                    return BattleResult.ESCAPED;
+                if (action == PlayerAction.ATTACK) {
+                    sandInEyes = playerBasicAttack(player, enemy, sandInEyes);
+                    actionResolved = true;
+                } else if (action == PlayerAction.TORCH) {
+                    sandInEyes = playerTorchAttack(player, enemy, sandInEyes);
+                    actionResolved = true;
+                } else if (action == PlayerAction.ACTION) {
+                    BattleTurnResult result = openActionMenu();
+                    actionResolved = result.isTurnConsumed();
+                    dodgeActive = result.isDodgeActive();
+                } else if (action == PlayerAction.INVENTORY) {
+                    BattleTurnResult result = useItemInBattle(player, enemy, sandInEyes);
+
+                    if (result.didConsumeSandBlindness()) {
+                        sandInEyes = result.isSandInEyes();
+                    }
+
+                    actionResolved = result.isTurnConsumed();
+                } else if (action == PlayerAction.RUN) {
+                    boolean escaped = tryRun(player);
+                    actionResolved = true;
+
+                    if (escaped) {
+                        return BattleResult.ESCAPED;
+                    }
                 }
             }
 
@@ -732,6 +750,11 @@ class BattleManager {
 
             EnemyMove move = enemy.chooseMove(random);
             System.out.println(enemy.getName() + " uses " + move.getName() + "!");
+
+            if (dodgeActive) {
+                System.out.println("You managed to dodge the attack!");
+                continue;
+            }
 
             int hitRoll = random.nextInt(100) + 1;
 
@@ -780,7 +803,7 @@ class BattleManager {
             Map<String, PlayerAction> options = new LinkedHashMap<>();
             int optionNumber = 1;
 
-            System.out.println(optionNumber + ". Attack");
+            System.out.println(optionNumber + ". Stick Attack");
             options.put(String.valueOf(optionNumber++), PlayerAction.ATTACK);
 
             if (player.hasItem("Torch")) {
@@ -788,8 +811,11 @@ class BattleManager {
                 options.put(String.valueOf(optionNumber++), PlayerAction.TORCH);
             }
 
-            System.out.println(optionNumber + ". Item");
-            options.put(String.valueOf(optionNumber++), PlayerAction.ITEM);
+            System.out.println(optionNumber + ". Action");
+            options.put(String.valueOf(optionNumber++), PlayerAction.ACTION);
+
+            System.out.println(optionNumber + ". Inventory");
+            options.put(String.valueOf(optionNumber++), PlayerAction.INVENTORY);
 
             System.out.println(optionNumber + ". Run");
             options.put(String.valueOf(optionNumber), PlayerAction.RUN);
@@ -862,13 +888,34 @@ class BattleManager {
         return false;
     }
 
-    private void useItemInBattle(Player player) {
+    private BattleTurnResult openActionMenu() {
+        while (true) {
+            System.out.println("Action:");
+            System.out.println("1. Dodge");
+            System.out.println("0. Return");
+            System.out.print("Choose action: ");
+            String answer = DarkHoldsFloor1Prototype.input.nextLine().trim();
+
+            if (answer.equals("1")) {
+                System.out.println("You prepare to dodge the next attack.");
+                return new BattleTurnResult(true, false, false, true);
+            }
+
+            if (answer.equals("0")) {
+                return new BattleTurnResult(false, false, false, false);
+            }
+
+            System.out.println("Invalid choice.");
+        }
+    }
+
+    private BattleTurnResult useItemInBattle(Player player, Enemy enemy, boolean sandInEyes) {
         while (true) {
             System.out.println("Inventory:");
 
             if (player.getInventory().isEmpty()) {
                 System.out.println("You have no items.");
-                return;
+                return new BattleTurnResult(false, sandInEyes, false, false);
             }
 
             for (int i = 0; i < player.getInventory().size(); i++) {
@@ -880,7 +927,7 @@ class BattleManager {
             String answer = DarkHoldsFloor1Prototype.input.nextLine().trim();
 
             if (answer.equals("0")) {
-                return;
+                return new BattleTurnResult(false, sandInEyes, false, false);
             }
 
             try {
@@ -897,11 +944,20 @@ class BattleManager {
                     player.heal(item.getPower());
                     System.out.println("You use " + item.getName() + " and restore " + item.getPower() + " HP.");
                     player.removeItem(index);
-                    return;
+                    return new BattleTurnResult(true, sandInEyes, false, false);
+                }
+
+                if (item.getName().equalsIgnoreCase("Stick")) {
+                    boolean updatedSandInEyes = playerBasicAttack(player, enemy, sandInEyes);
+                    return new BattleTurnResult(true, updatedSandInEyes, true, false);
+                }
+
+                if (item.getName().equalsIgnoreCase("Torch")) {
+                    boolean updatedSandInEyes = playerTorchAttack(player, enemy, sandInEyes);
+                    return new BattleTurnResult(true, updatedSandInEyes, true, false);
                 }
 
                 System.out.println(item.getName() + " cannot be used in battle right now.");
-                return;
             } catch (NumberFormatException e) {
                 System.out.println("Invalid item choice.");
             }
@@ -1398,6 +1454,37 @@ enum BattleResult {
 enum PlayerAction {
     ATTACK,
     TORCH,
-    ITEM,
+    ACTION,
+    INVENTORY,
     RUN
+}
+
+class BattleTurnResult {
+    private final boolean turnConsumed;
+    private final boolean sandInEyes;
+    private final boolean consumeSandBlindness;
+    private final boolean dodgeActive;
+
+    public BattleTurnResult(boolean turnConsumed, boolean sandInEyes, boolean consumeSandBlindness, boolean dodgeActive) {
+        this.turnConsumed = turnConsumed;
+        this.sandInEyes = sandInEyes;
+        this.consumeSandBlindness = consumeSandBlindness;
+        this.dodgeActive = dodgeActive;
+    }
+
+    public boolean isTurnConsumed() {
+        return turnConsumed;
+    }
+
+    public boolean isSandInEyes() {
+        return sandInEyes;
+    }
+
+    public boolean didConsumeSandBlindness() {
+        return consumeSandBlindness;
+    }
+
+    public boolean isDodgeActive() {
+        return dodgeActive;
+    }
 }
