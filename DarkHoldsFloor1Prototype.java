@@ -4,10 +4,13 @@ import java.util.*;
 /**
  * Dark Holds - Floor 1 Prototype
  * --------------------------------
- * This prototype rebuilds the first floor around a semi-random room deck,
- * classic alternating turns, and the Giant Snake as the first floor boss.
+ * Refactored version with the hybrid item architecture folded into the prototype.
  *
- * Built for team discussion and fast playtesting.
+ * Design goals:
+ * - Keep current prototype functionality the same for playtesting.
+ * - Reorganize the file into clear sections for game flow, room generation,
+ *   combat, player/room data, and item architecture.
+ * - Integrate richer item types without forcing a full combat or room rewrite.
  */
 public class DarkHoldsFloor1Prototype {
 
@@ -19,7 +22,13 @@ public class DarkHoldsFloor1Prototype {
     }
 }
 
+/* =====================================================
+   SECTION 1 - GAME FLOW AND MAIN LOOP
+   ===================================================== */
+
 class Game {
+    private static final String FLOOR_ONE_IRON_KEY_ID = "locked_hall_iron_key";
+
     private Player player;
     private Map<String, Room> rooms;
     private final Random random;
@@ -37,6 +46,9 @@ class Game {
         gameLoop();
     }
 
+    /**
+     * Show the opening story and create the player.
+     */
     private void introStory() {
         System.out.println("========================================");
         System.out.println("           DARK HOLDS");
@@ -58,6 +70,9 @@ class Game {
         player = new Player(name);
     }
 
+    /**
+     * Build the floor, distribute guaranteed loot, and place the player in the safe room.
+     */
     private void setupGame() {
         rooms = WorldBuilder.createFloorOne(random);
         distributeGuaranteedLoot();
@@ -66,6 +81,12 @@ class Game {
         running = true;
     }
 
+    /**
+     * Place the guaranteed key, torch, potions, and relic into valid reward rooms.
+     *
+     * The floor-one key is now stored as a real key object on the player, but it remains
+     * outside the normal inventory menu so current prototype behavior stays familiar.
+     */
     private void distributeGuaranteedLoot() {
         List<Room> keyEligibleRooms = new ArrayList<>();
         List<Room> torchEligibleRooms = new ArrayList<>();
@@ -89,20 +110,23 @@ class Game {
         keyRoom.setHasKeyReward(true);
 
         Room torchRoom = torchEligibleRooms.get(random.nextInt(torchEligibleRooms.size()));
-        torchRoom.addRewardItem(new Item("Torch", ItemType.WEAPON, 0));
+        torchRoom.addRewardItem(DarkHoldsItems.torch());
 
         Collections.shuffle(potionEligibleRooms, random);
         int potionCount = Math.min(3, potionEligibleRooms.size());
 
         for (int i = 0; i < potionCount; i++) {
-            potionEligibleRooms.get(i).addRewardItem(new Item("Small Potion", ItemType.HEALING, 15));
+            potionEligibleRooms.get(i).addRewardItem(DarkHoldsItems.smallPotion());
         }
 
         Room hoard = rooms.get("snakeHoard");
-        hoard.addRewardItem(new Item("Ancient Relic", ItemType.SPECIAL, 0));
+        hoard.addRewardItem(DarkHoldsItems.ancientRelic());
         hoard.addGold(randomBetween(25, 50));
     }
 
+    /**
+     * Run the main room loop until the player dies, wins, or exits the prototype.
+     */
     private void gameLoop() {
         while (running) {
             if (!player.isAlive()) {
@@ -155,6 +179,12 @@ class Game {
         }
     }
 
+    /**
+     * Show the player's current stats.
+     *
+     * Attack and Defense now flow through the richer item architecture, so passive gear
+     * would be reflected automatically if later added to the player's inventory.
+     */
     private void showPlayerStatus() {
         System.out.println();
         System.out.println("Player: " + player.getName());
@@ -163,9 +193,12 @@ class Game {
         System.out.println("Defense: " + player.getDefense());
         System.out.println("Level: " + player.getLevel() + "   XP: " + player.getXp());
         System.out.println("Gold: " + player.getGold());
-        System.out.println("Has Key: " + player.hasKey());
+        System.out.println("Has Key: " + player.hasAnyKey());
     }
 
+    /**
+     * Reveal gold, key rewards, and item rewards after a room is safe.
+     */
     private void revealRoomRewards(Room room) {
         if (room.isRewardsCollected()) {
             return;
@@ -187,7 +220,7 @@ class Game {
         if (room.hasKeyReward()) {
             System.out.println();
             System.out.println("You discover an Iron Key hidden here.");
-            player.setHasKey(true);
+            player.addKey(DarkHoldsItems.floorOneIronKey());
             foundSomething = true;
         }
 
@@ -205,6 +238,9 @@ class Game {
         }
     }
 
+    /**
+     * Ask whether the player wants to begin a battle or step back before it starts.
+     */
     private boolean promptBeforeBattle(Room room) {
         while (true) {
             System.out.println();
@@ -227,6 +263,12 @@ class Game {
         }
     }
 
+    /**
+     * Show available room exits and the overworld inventory menu.
+     *
+     * Locked-hall checking now looks for a specific key object instead of a player boolean,
+     * while preserving the same visible prototype behavior.
+     */
     private void handleRoomChoices(Room current) {
         while (true) {
             System.out.println();
@@ -236,7 +278,9 @@ class Game {
                 Room nextRoom = rooms.get(neighborIds.get(i));
                 String text = "Go to " + nextRoom.getName();
 
-                if (current.getId().equals("safe") && nextRoom.getId().equals("lockedHall") && !player.hasKey()) {
+                if (current.getId().equals("safe")
+                        && nextRoom.getId().equals("lockedHall")
+                        && !player.hasKey(FLOOR_ONE_IRON_KEY_ID)) {
                     text = "Try the locked hallway (locked)";
                 }
 
@@ -262,11 +306,12 @@ class Game {
 
                 Room nextRoom = rooms.get(neighborIds.get(choice - 1));
 
-                if (current.getId().equals("safe") && nextRoom.getId().equals("lockedHall") && !player.hasKey()) {
+                if (current.getId().equals("safe")
+                        && nextRoom.getId().equals("lockedHall")
+                        && !player.hasKey(FLOOR_ONE_IRON_KEY_ID)) {
                     System.out.println("The heavy hallway gate is locked. You need a key.");
                     continue;
                 }
-
 
                 player.setPreviousRoom(player.getCurrentRoom());
                 player.setCurrentRoom(nextRoom.getId());
@@ -277,12 +322,17 @@ class Game {
         }
     }
 
+    /**
+     * Hide the boss-hoard connection until the floor boss is defeated.
+     */
     private List<String> getVisibleNeighborIds(Room current) {
         List<String> visible = new ArrayList<>();
 
         for (String neighborId : current.getNeighborIds()) {
-            if (current.getId().equals("snakeBoss") && neighborId.equals("snakeHoard")
-                    && current.hasEnemy() && !current.getEnemy().isDefeated()) {
+            if (current.getId().equals("snakeBoss")
+                    && neighborId.equals("snakeHoard")
+                    && current.hasEnemy()
+                    && !current.getEnemy().isDefeated()) {
                 continue;
             }
 
@@ -292,6 +342,12 @@ class Game {
         return visible;
     }
 
+    /**
+     * Run the overworld inventory menu.
+     *
+     * Outside battle, only items marked for outside use can activate. Passive items and
+     * combat-only items simply explain that they cannot be used here.
+     */
     private void openInventoryMenu() {
         while (true) {
             System.out.println();
@@ -332,10 +388,18 @@ class Game {
 
                 Item item = player.getInventory().get(index);
 
-                if (item.getType() == ItemType.HEALING) {
-                    player.heal(item.getPower());
-                    System.out.println("You use " + item.getName() + " and restore " + item.getPower() + " HP.");
-                    player.removeItem(index);
+                if (item instanceof GameItem gameItem && gameItem.canUseOutsideBattle()) {
+                    ItemContext context = new ItemContext();
+                    context.setInBattle(false);
+                    context.setCurrentRoomId(player.getCurrentRoom());
+                    context.setPreviousRoomId(player.getPreviousRoom());
+
+                    boolean removeAfterUse = gameItem.use(player, context);
+
+                    if (removeAfterUse) {
+                        player.removeItem(index);
+                    }
+
                     continue;
                 }
 
@@ -346,6 +410,9 @@ class Game {
         }
     }
 
+    /**
+     * Print the victory message and stop the loop.
+     */
     private void victory() {
         System.out.println();
         System.out.println("========================================");
@@ -357,6 +424,9 @@ class Game {
         running = false;
     }
 
+    /**
+     * Print the game over message and stop the loop.
+     */
     private void gameOver(String message) {
         System.out.println();
         System.out.println("========================================");
@@ -366,19 +436,29 @@ class Game {
         running = false;
     }
 
+    /**
+     * Roll a number inside an inclusive range.
+     */
     private int randomBetween(int min, int max) {
         return min + random.nextInt(max - min + 1);
     }
 }
 
+/* =====================================================
+   SECTION 2 - WORLD GENERATION AND ROOM LAYOUT
+   ===================================================== */
+
 class WorldBuilder {
 
+    /**
+     * Build the full first floor, including the main route, optional rooms, and all room links.
+     */
     public static Map<String, Room> createFloorOne(Random random) {
         Map<String, Room> rooms = new LinkedHashMap<>();
 
         Room safeRoom = new Room("safe", "Safe Room",
-                "You wake in a cold stone chamber with only a rough stick beside you. " +
-                "A heavy locked hallway gate stands to one side, and the rest of the floor branches into darkness.",
+                "You wake in a cold stone chamber with only a rough stick beside you. "
+                        + "A heavy locked hallway gate stands to one side, and the rest of the floor branches into darkness.",
                 true, true);
 
         Room brokenFork = new Room("brokenFork", "Broken Fork",
@@ -483,6 +563,9 @@ class WorldBuilder {
         return rooms;
     }
 
+    /**
+     * Build the variable middle goblin room from a weighted random selection.
+     */
     private static Room createGoblinMiddleRoom(Random random) {
         int roll = random.nextInt(10);
 
@@ -527,6 +610,9 @@ class WorldBuilder {
         return room;
     }
 
+    /**
+     * Build an optional room from a weighted list of encounter templates.
+     */
     private static Room createOptionalRoom(Random random, String id) {
         List<Integer> weightedPool = Arrays.asList(0, 0, 1, 1, 2, 3);
         int pick = weightedPool.get(random.nextInt(weightedPool.size()));
@@ -566,6 +652,9 @@ class WorldBuilder {
         return room;
     }
 
+    /**
+     * Create a goblin enemy and its moves.
+     */
     private static Enemy createGoblinEnemy() {
         return new Enemy(
                 EnemyType.GOBLIN,
@@ -581,6 +670,9 @@ class WorldBuilder {
         );
     }
 
+    /**
+     * Create a bat enemy and its moves.
+     */
     private static Enemy createBatEnemy() {
         return new Enemy(
                 EnemyType.BAT,
@@ -595,6 +687,9 @@ class WorldBuilder {
         );
     }
 
+    /**
+     * Create a wolf enemy and its moves.
+     */
     private static Enemy createWolfEnemy() {
         return new Enemy(
                 EnemyType.WOLF,
@@ -609,6 +704,9 @@ class WorldBuilder {
         );
     }
 
+    /**
+     * Create a slime enemy and its moves.
+     */
     private static Enemy createSlimeEnemy() {
         return new Enemy(
                 EnemyType.SLIME,
@@ -623,6 +721,9 @@ class WorldBuilder {
         );
     }
 
+    /**
+     * Create the floor boss and its moves.
+     */
     private static Enemy createSnakeEnemy() {
         return new Enemy(
                 EnemyType.SNAKE,
@@ -638,24 +739,35 @@ class WorldBuilder {
         );
     }
 
+    /**
+     * Link two rooms in both directions.
+     */
     private static void connect(Room a, Room b) {
         a.addNeighbor(b.getId());
         b.addNeighbor(a.getId());
     }
 
+    /**
+     * Roll a number inside an inclusive range.
+     */
     private static int randomBetween(Random random, int min, int max) {
         return min + random.nextInt(max - min + 1);
     }
 
+    /**
+     * Roll an enemy gold reward inside an inclusive range.
+     */
     private static int randomGold(int min, int max) {
         Random random = new Random();
         return min + random.nextInt(max - min + 1);
     }
 }
 
+/* =====================================================
+   SECTION 3 - COMBAT FLOW, ENEMY DATA, AND TURN RESULTS
+   ===================================================== */
+
 class BattleManager {
-    private static final int PLAYER_ATTACK_ACCURACY = 95;
-    private static final int PLAYER_TORCH_ACCURACY = 80;
     private static final int RUN_SUCCESS_RATE = 80;
     private static final int CONSTRICT_DAMAGE = 2;
 
@@ -665,6 +777,9 @@ class BattleManager {
         this.random = new Random();
     }
 
+    /**
+     * Run a full battle until the player wins, dies, or escapes.
+     */
     public BattleResult handleBattle(Player player, Room room) {
         Enemy enemy = room.getEnemy();
         boolean sandInEyes = false;
@@ -734,6 +849,10 @@ class BattleManager {
                     }
 
                     actionResolved = result.isTurnConsumed();
+
+                    if (result.isForcedEscape()) {
+                        return BattleResult.ESCAPED;
+                    }
                 } else if (action == PlayerAction.RUN) {
                     boolean escaped = tryRun(player);
                     actionResolved = true;
@@ -798,6 +917,12 @@ class BattleManager {
         return BattleResult.WON;
     }
 
+    /**
+     * Show the current battle menu.
+     *
+     * This still preserves the prototype's current action list:
+     * Stick Attack, Torch when carried, Action, Inventory, and Run.
+     */
     private PlayerAction promptPlayerAction(Player player) {
         while (true) {
             Map<String, PlayerAction> options = new LinkedHashMap<>();
@@ -806,7 +931,7 @@ class BattleManager {
             System.out.println(optionNumber + ". Stick Attack");
             options.put(String.valueOf(optionNumber++), PlayerAction.ATTACK);
 
-            if (player.hasItem("Torch")) {
+            if (DarkHoldsItems.playerHasTorch(player)) {
                 System.out.println(optionNumber + ". Torch");
                 options.put(String.valueOf(optionNumber++), PlayerAction.TORCH);
             }
@@ -832,8 +957,12 @@ class BattleManager {
         }
     }
 
+    /**
+     * Resolve the current stick attack without changing its existing prototype behavior.
+     */
     private boolean playerBasicAttack(Player player, Enemy enemy, boolean sandInEyes) {
-        int accuracy = PLAYER_ATTACK_ACCURACY;
+        WeaponItem stick = DarkHoldsItems.findWeapon(player, "Stick");
+        int accuracy = stick != null ? stick.getAccuracy() : 95;
 
         if (sandInEyes) {
             accuracy = Math.max(1, accuracy / 2);
@@ -849,7 +978,9 @@ class BattleManager {
 
         int damage;
 
-        if (enemy.getType() == EnemyType.SLIME) {
+        if (stick != null) {
+            damage = stick.getDamageAgainst(enemy, player);
+        } else if (enemy.getType() == EnemyType.SLIME) {
             damage = 2;
         } else {
             damage = calculatePlayerDamage(player.getAttack(), 2, enemy.getDefense());
@@ -860,8 +991,12 @@ class BattleManager {
         return false;
     }
 
+    /**
+     * Resolve the current torch attack without changing its existing prototype behavior.
+     */
     private boolean playerTorchAttack(Player player, Enemy enemy, boolean sandInEyes) {
-        int accuracy = PLAYER_TORCH_ACCURACY;
+        WeaponItem torch = DarkHoldsItems.findWeapon(player, "Torch");
+        int accuracy = torch != null ? torch.getAccuracy() : 80;
 
         if (sandInEyes) {
             accuracy = Math.max(1, accuracy / 2);
@@ -877,7 +1012,9 @@ class BattleManager {
 
         int damage;
 
-        if (enemy.getType() == EnemyType.SLIME) {
+        if (torch != null) {
+            damage = torch.getDamageAgainst(enemy, player);
+        } else if (enemy.getType() == EnemyType.SLIME) {
             damage = Math.max(10, calculatePlayerDamage(player.getAttack(), 4, enemy.getDefense()) + 6);
         } else {
             damage = calculatePlayerDamage(player.getAttack(), 4, enemy.getDefense());
@@ -888,6 +1025,9 @@ class BattleManager {
         return false;
     }
 
+    /**
+     * Open the action submenu. Right now it only contains Dodge.
+     */
     private BattleTurnResult openActionMenu() {
         while (true) {
             System.out.println("Action:");
@@ -898,24 +1038,31 @@ class BattleManager {
 
             if (answer.equals("1")) {
                 System.out.println("You prepare to dodge the next attack.");
-                return new BattleTurnResult(true, false, false, true);
+                return new BattleTurnResult(true, false, false, true, false);
             }
 
             if (answer.equals("0")) {
-                return new BattleTurnResult(false, false, false, false);
+                return new BattleTurnResult(false, false, false, false, false);
             }
 
             System.out.println("Invalid choice.");
         }
     }
 
+    /**
+     * Open the battle inventory menu.
+     *
+     * Stick and Torch still duplicate their battle actions from inventory.
+     * Other battle-usable game items now route through the richer item architecture.
+     * Invalid choices do not consume the player's turn.
+     */
     private BattleTurnResult useItemInBattle(Player player, Enemy enemy, boolean sandInEyes) {
         while (true) {
             System.out.println("Inventory:");
 
             if (player.getInventory().isEmpty()) {
                 System.out.println("You have no items.");
-                return new BattleTurnResult(false, sandInEyes, false, false);
+                return new BattleTurnResult(false, sandInEyes, false, false, false);
             }
 
             for (int i = 0; i < player.getInventory().size(); i++) {
@@ -927,7 +1074,7 @@ class BattleManager {
             String answer = DarkHoldsFloor1Prototype.input.nextLine().trim();
 
             if (answer.equals("0")) {
-                return new BattleTurnResult(false, sandInEyes, false, false);
+                return new BattleTurnResult(false, sandInEyes, false, false, false);
             }
 
             try {
@@ -940,21 +1087,34 @@ class BattleManager {
 
                 Item item = player.getInventory().get(index);
 
-                if (item.getType() == ItemType.HEALING) {
-                    player.heal(item.getPower());
-                    System.out.println("You use " + item.getName() + " and restore " + item.getPower() + " HP.");
-                    player.removeItem(index);
-                    return new BattleTurnResult(true, sandInEyes, false, false);
-                }
-
                 if (item.getName().equalsIgnoreCase("Stick")) {
                     boolean updatedSandInEyes = playerBasicAttack(player, enemy, sandInEyes);
-                    return new BattleTurnResult(true, updatedSandInEyes, true, false);
+                    return new BattleTurnResult(true, updatedSandInEyes, true, false, false);
                 }
 
                 if (item.getName().equalsIgnoreCase("Torch")) {
                     boolean updatedSandInEyes = playerTorchAttack(player, enemy, sandInEyes);
-                    return new BattleTurnResult(true, updatedSandInEyes, true, false);
+                    return new BattleTurnResult(true, updatedSandInEyes, true, false, false);
+                }
+
+                if (item instanceof GameItem gameItem && gameItem.canUseInBattle()) {
+                    ItemContext context = new ItemContext();
+                    context.setInBattle(true);
+                    context.setCurrentEnemy(enemy);
+                    context.setCurrentRoomId(player.getCurrentRoom());
+                    context.setPreviousRoomId(player.getPreviousRoom());
+
+                    boolean removeAfterUse = gameItem.use(player, context);
+
+                    if (removeAfterUse) {
+                        player.removeItem(index);
+                    }
+
+                    if (context.isEscapedByItem()) {
+                        return new BattleTurnResult(true, sandInEyes, false, false, true);
+                    }
+
+                    return new BattleTurnResult(true, sandInEyes, false, false, false);
                 }
 
                 System.out.println(item.getName() + " cannot be used in battle right now.");
@@ -964,6 +1124,9 @@ class BattleManager {
         }
     }
 
+    /**
+     * Attempt to escape the current battle and return to the previous room.
+     */
     private boolean tryRun(Player player) {
         int roll = random.nextInt(100) + 1;
 
@@ -977,299 +1140,22 @@ class BattleManager {
         return false;
     }
 
+    /**
+     * Calculate normal player damage from attack stat, move power, and enemy defense.
+     */
     private int calculatePlayerDamage(int playerAttack, int movePower, int enemyDefense) {
         return Math.max(1, movePower + playerAttack - enemyDefense);
     }
 
+    /**
+     * Calculate enemy damage, including the special Pocket Sand exception.
+     */
     private int calculateEnemyDamage(Enemy enemy, EnemyMove move, Player player) {
         if (move.getEffect() == MoveEffect.POCKET_SAND) {
             return 1;
         }
 
         return Math.max(1, move.getPower() + enemy.getAttack() - player.getDefense());
-    }
-}
-
-class Player {
-    private static final int[] XP_THRESHOLDS = {0, 18, 42, 75};
-    private static final int[] HP_BY_LEVEL = {50, 53, 57, 61};
-    private static final int[] ATTACK_BY_LEVEL = {8, 9, 10, 11};
-    private static final int[] DEFENSE_BY_LEVEL = {2, 2, 3, 3};
-
-    private final String name;
-    private int hp;
-    private int maxHp;
-    private int attack;
-    private int defense;
-    private int level;
-    private int xp;
-    private int gold;
-    private boolean hasKey;
-    private String currentRoom;
-    private String previousRoom;
-    private final ArrayList<Item> inventory;
-
-    public Player(String name) {
-        this.name = name;
-        this.level = 1;
-        this.xp = 0;
-        this.gold = 0;
-        this.hasKey = false;
-        this.maxHp = HP_BY_LEVEL[0];
-        this.hp = maxHp;
-        this.attack = ATTACK_BY_LEVEL[0];
-        this.defense = DEFENSE_BY_LEVEL[0];
-        this.inventory = new ArrayList<>();
-        this.inventory.add(new Item("Stick", ItemType.WEAPON, 0));
-    }
-
-    public void takeDamage(int amount) {
-        hp -= amount;
-
-        if (hp < 0) {
-            hp = 0;
-        }
-    }
-
-    public void heal(int amount) {
-        hp += amount;
-
-        if (hp > maxHp) {
-            hp = maxHp;
-        }
-    }
-
-    public boolean isAlive() {
-        return hp > 0;
-    }
-
-    public void addXp(int amount) {
-        xp += amount;
-    }
-
-    public void checkLevelUp() {
-        while (level < 4 && xp >= XP_THRESHOLDS[level]) {
-            level++;
-            maxHp = HP_BY_LEVEL[level - 1];
-            attack = ATTACK_BY_LEVEL[level - 1];
-            defense = DEFENSE_BY_LEVEL[level - 1];
-            hp = maxHp;
-            System.out.println("You reached level " + level + "!");
-            System.out.println("Your strength rises.");
-        }
-    }
-
-    public void addGold(int amount) {
-        gold += amount;
-    }
-
-    public void addItem(Item item) {
-        inventory.add(item);
-    }
-
-    public void removeItem(int index) {
-        inventory.remove(index);
-    }
-
-    public boolean hasItem(String itemName) {
-        for (Item item : inventory) {
-            if (item.getName().equalsIgnoreCase(itemName)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public int getHp() {
-        return hp;
-    }
-
-    public int getMaxHp() {
-        return maxHp;
-    }
-
-    public int getAttack() {
-        return attack;
-    }
-
-    public int getDefense() {
-        return defense;
-    }
-
-    public int getLevel() {
-        return level;
-    }
-
-    public int getXp() {
-        return xp;
-    }
-
-    public int getGold() {
-        return gold;
-    }
-
-    public boolean hasKey() {
-        return hasKey;
-    }
-
-    public void setHasKey(boolean hasKey) {
-        this.hasKey = hasKey;
-    }
-
-    public String getCurrentRoom() {
-        return currentRoom;
-    }
-
-    public void setCurrentRoom(String currentRoom) {
-        this.currentRoom = currentRoom;
-    }
-
-    public String getPreviousRoom() {
-        return previousRoom;
-    }
-
-    public void setPreviousRoom(String previousRoom) {
-        this.previousRoom = previousRoom;
-    }
-
-    public ArrayList<Item> getInventory() {
-        return inventory;
-    }
-}
-
-class Room {
-    private final String id;
-    private final String name;
-    private final String description;
-    private String clearedDescription;
-    private final ArrayList<String> neighborIds;
-    private final ArrayList<Item> rewardItems;
-    private Enemy enemy;
-    private int goldReward;
-    private boolean hasKeyReward;
-    private boolean rewardsCollected;
-    private boolean preLock;
-    private boolean keyEligible;
-
-    public Room(String id, String name, String description, boolean preLock, boolean keyEligible) {
-        this.id = id;
-        this.name = name;
-        this.description = description;
-        this.clearedDescription = "This room is still and quiet now.";
-        this.preLock = preLock;
-        this.keyEligible = keyEligible;
-        this.neighborIds = new ArrayList<>();
-        this.rewardItems = new ArrayList<>();
-        this.goldReward = 0;
-        this.hasKeyReward = false;
-        this.rewardsCollected = false;
-    }
-
-    public void addNeighbor(String neighborId) {
-        if (!neighborIds.contains(neighborId)) {
-            neighborIds.add(neighborId);
-        }
-    }
-
-    public void addRewardItem(Item item) {
-        rewardItems.add(item);
-    }
-
-    public void addGold(int amount) {
-        goldReward += amount;
-    }
-
-    public boolean hasEnemy() {
-        return enemy != null;
-    }
-
-    public String getId() {
-        return id;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public String getDescription() {
-        return description;
-    }
-
-    public String getDisplayDescription() {
-        if (hasBeenCleared()) {
-            return clearedDescription;
-        }
-
-        return description;
-    }
-
-    public void setClearedDescription(String clearedDescription) {
-        this.clearedDescription = clearedDescription;
-    }
-
-    public boolean hasBeenCleared() {
-        if (hasEnemy() && enemy.isDefeated()) {
-            return true;
-        }
-
-        return rewardsCollected;
-    }
-
-    public ArrayList<String> getNeighborIds() {
-        return neighborIds;
-    }
-
-    public Enemy getEnemy() {
-        return enemy;
-    }
-
-    public void setEnemy(Enemy enemy) {
-        this.enemy = enemy;
-    }
-
-    public int getGoldReward() {
-        return goldReward;
-    }
-
-    public boolean hasKeyReward() {
-        return hasKeyReward;
-    }
-
-    public void setHasKeyReward(boolean hasKeyReward) {
-        this.hasKeyReward = hasKeyReward;
-    }
-
-    public ArrayList<Item> getRewardItems() {
-        return rewardItems;
-    }
-
-    public boolean isRewardsCollected() {
-        return rewardsCollected;
-    }
-
-    public void setRewardsCollected(boolean rewardsCollected) {
-        this.rewardsCollected = rewardsCollected;
-    }
-
-    public boolean isPreLock() {
-        return preLock;
-    }
-
-    public void setPreLock(boolean preLock) {
-        this.preLock = preLock;
-    }
-
-    public boolean isKeyEligible() {
-        return keyEligible;
-    }
-
-    public void setKeyEligible(boolean keyEligible) {
-        this.keyEligible = keyEligible;
     }
 }
 
@@ -1298,9 +1184,7 @@ class Enemy {
         this.defeated = false;
         this.moves = new ArrayList<>();
 
-        for (EnemyMove move : moves) {
-            this.moves.add(move);
-        }
+        Collections.addAll(this.moves, moves);
     }
 
     public EnemyMove chooseMove(Random random) {
@@ -1396,6 +1280,579 @@ class EnemyMove {
     }
 }
 
+enum EnemyType {
+    GOBLIN,
+    BAT,
+    WOLF,
+    SLIME,
+    SNAKE
+}
+
+enum MoveEffect {
+    NONE,
+    POCKET_SAND,
+    CONSTRICT
+}
+
+enum BattleResult {
+    WON,
+    ESCAPED,
+    DIED
+}
+
+enum PlayerAction {
+    ATTACK,
+    TORCH,
+    ACTION,
+    INVENTORY,
+    RUN
+}
+
+class BattleTurnResult {
+    private final boolean turnConsumed;
+    private final boolean sandInEyes;
+    private final boolean consumeSandBlindness;
+    private final boolean dodgeActive;
+    private final boolean forcedEscape;
+
+    public BattleTurnResult(boolean turnConsumed, boolean sandInEyes, boolean consumeSandBlindness,
+                            boolean dodgeActive, boolean forcedEscape) {
+        this.turnConsumed = turnConsumed;
+        this.sandInEyes = sandInEyes;
+        this.consumeSandBlindness = consumeSandBlindness;
+        this.dodgeActive = dodgeActive;
+        this.forcedEscape = forcedEscape;
+    }
+
+    public boolean isTurnConsumed() {
+        return turnConsumed;
+    }
+
+    public boolean isSandInEyes() {
+        return sandInEyes;
+    }
+
+    public boolean didConsumeSandBlindness() {
+        return consumeSandBlindness;
+    }
+
+    public boolean isDodgeActive() {
+        return dodgeActive;
+    }
+
+    public boolean isForcedEscape() {
+        return forcedEscape;
+    }
+}
+
+/* =====================================================
+   SECTION 4 - PLAYER STATE AND ROOM DATA
+   ===================================================== */
+
+class Player {
+    private static final int[] XP_THRESHOLDS = {0, 18, 42, 75};
+    private static final int[] HP_BY_LEVEL = {50, 53, 57, 61};
+    private static final int[] ATTACK_BY_LEVEL = {8, 9, 10, 11};
+    private static final int[] DEFENSE_BY_LEVEL = {2, 2, 3, 3};
+
+    private final String name;
+    private int hp;
+    private int maxHp;
+    private int baseAttack;
+    private int baseDefense;
+    private int level;
+    private int xp;
+    private int gold;
+    private String currentRoom;
+    private String previousRoom;
+    private final ArrayList<Item> inventory;
+    private final ArrayList<KeyItem> keys;
+
+    public Player(String name) {
+        this.name = name;
+        this.level = 1;
+        this.xp = 0;
+        this.gold = 0;
+        this.maxHp = HP_BY_LEVEL[0];
+        this.hp = maxHp;
+        this.baseAttack = ATTACK_BY_LEVEL[0];
+        this.baseDefense = DEFENSE_BY_LEVEL[0];
+        this.inventory = new ArrayList<>();
+        this.keys = new ArrayList<>();
+        this.inventory.add(DarkHoldsItems.stick());
+    }
+
+    /**
+     * Reduce HP but never below zero.
+     */
+    public void takeDamage(int amount) {
+        hp -= amount;
+
+        if (hp < 0) {
+            hp = 0;
+        }
+    }
+
+    /**
+     * Restore HP but never above max HP.
+     */
+    public void heal(int amount) {
+        hp += amount;
+
+        if (hp > maxHp) {
+            hp = maxHp;
+        }
+    }
+
+    public boolean isAlive() {
+        return hp > 0;
+    }
+
+    public void addXp(int amount) {
+        xp += amount;
+    }
+
+    /**
+     * Apply level-up thresholds and refresh the player's base stats.
+     */
+    public void checkLevelUp() {
+        while (level < 4 && xp >= XP_THRESHOLDS[level]) {
+            level++;
+            maxHp = HP_BY_LEVEL[level - 1];
+            baseAttack = ATTACK_BY_LEVEL[level - 1];
+            baseDefense = DEFENSE_BY_LEVEL[level - 1];
+            hp = maxHp;
+            System.out.println("You reached level " + level + "!");
+            System.out.println("Your strength rises.");
+        }
+    }
+
+    public void addGold(int amount) {
+        gold += amount;
+    }
+
+    /**
+     * Add a normal item to the player's carried inventory.
+     */
+    public void addItem(Item item) {
+        inventory.add(item);
+    }
+
+    public void removeItem(int index) {
+        inventory.remove(index);
+    }
+
+    public boolean hasItem(String itemName) {
+        for (Item item : inventory) {
+            if (item.getName().equalsIgnoreCase(itemName)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Add a key object to the player's key collection.
+     *
+     * Keys are modeled as real items now, but are stored separately from the main
+     * inventory so the current prototype menus remain unchanged.
+     */
+    public void addKey(KeyItem key) {
+        keys.add(key);
+    }
+
+    public boolean hasAnyKey() {
+        return !keys.isEmpty();
+    }
+
+    public boolean hasKey(String keyId) {
+        for (KeyItem key : keys) {
+            if (key.getKeyId().equalsIgnoreCase(keyId)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public int getHp() {
+        return hp;
+    }
+
+    public int getMaxHp() {
+        return maxHp;
+    }
+
+    /**
+     * Return attack with any passive item bonuses included.
+     */
+    public int getAttack() {
+        return baseAttack + DarkHoldsItems.getPassiveAttackBonus(this);
+    }
+
+    /**
+     * Return defense with any passive item bonuses included.
+     */
+    public int getDefense() {
+        return baseDefense + DarkHoldsItems.getPassiveDefenseBonus(this);
+    }
+
+    public int getLevel() {
+        return level;
+    }
+
+    public int getXp() {
+        return xp;
+    }
+
+    public int getGold() {
+        return gold;
+    }
+
+    public String getCurrentRoom() {
+        return currentRoom;
+    }
+
+    public void setCurrentRoom(String currentRoom) {
+        this.currentRoom = currentRoom;
+    }
+
+    public String getPreviousRoom() {
+        return previousRoom;
+    }
+
+    public void setPreviousRoom(String previousRoom) {
+        this.previousRoom = previousRoom;
+    }
+
+    public ArrayList<Item> getInventory() {
+        return inventory;
+    }
+
+    public ArrayList<KeyItem> getKeys() {
+        return keys;
+    }
+}
+
+class Room {
+    private final String id;
+    private final String name;
+    private final String description;
+    private String clearedDescription;
+    private final ArrayList<String> neighborIds;
+    private final ArrayList<Item> rewardItems;
+    private Enemy enemy;
+    private int goldReward;
+    private boolean hasKeyReward;
+    private boolean rewardsCollected;
+    private boolean preLock;
+    private boolean keyEligible;
+
+    public Room(String id, String name, String description, boolean preLock, boolean keyEligible) {
+        this.id = id;
+        this.name = name;
+        this.description = description;
+        this.clearedDescription = "This room is still and quiet now.";
+        this.preLock = preLock;
+        this.keyEligible = keyEligible;
+        this.neighborIds = new ArrayList<>();
+        this.rewardItems = new ArrayList<>();
+        this.goldReward = 0;
+        this.hasKeyReward = false;
+        this.rewardsCollected = false;
+    }
+
+    public void addNeighbor(String neighborId) {
+        if (!neighborIds.contains(neighborId)) {
+            neighborIds.add(neighborId);
+        }
+    }
+
+    public void addRewardItem(Item item) {
+        rewardItems.add(item);
+    }
+
+    public void addGold(int amount) {
+        goldReward += amount;
+    }
+
+    public boolean hasEnemy() {
+        return enemy != null;
+    }
+
+    public String getId() {
+        return id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public String getDisplayDescription() {
+        if (hasBeenCleared()) {
+            return clearedDescription;
+        }
+
+        return description;
+    }
+
+    public void setClearedDescription(String clearedDescription) {
+        this.clearedDescription = clearedDescription;
+    }
+
+    public boolean hasBeenCleared() {
+        if (hasEnemy() && enemy.isDefeated()) {
+            return true;
+        }
+
+        return rewardsCollected;
+    }
+
+    public ArrayList<String> getNeighborIds() {
+        return neighborIds;
+    }
+
+    public Enemy getEnemy() {
+        return enemy;
+    }
+
+    public void setEnemy(Enemy enemy) {
+        this.enemy = enemy;
+    }
+
+    public int getGoldReward() {
+        return goldReward;
+    }
+
+    public boolean hasKeyReward() {
+        return hasKeyReward;
+    }
+
+    public void setHasKeyReward(boolean hasKeyReward) {
+        this.hasKeyReward = hasKeyReward;
+    }
+
+    public ArrayList<Item> getRewardItems() {
+        return rewardItems;
+    }
+
+    public boolean isRewardsCollected() {
+        return rewardsCollected;
+    }
+
+    public void setRewardsCollected(boolean rewardsCollected) {
+        this.rewardsCollected = rewardsCollected;
+    }
+
+    public boolean isPreLock() {
+        return preLock;
+    }
+
+    public void setPreLock(boolean preLock) {
+        this.preLock = preLock;
+    }
+
+    public boolean isKeyEligible() {
+        return keyEligible;
+    }
+
+    public void setKeyEligible(boolean keyEligible) {
+        this.keyEligible = keyEligible;
+    }
+}
+
+/* =====================================================
+   SECTION 5 - ITEM ARCHITECTURE, ITEM HELPERS, AND ITEM TYPES
+   ===================================================== */
+
+/**
+ * Central item helper and factory class.
+ *
+ * This keeps the prototype's simple inventory model while still allowing a few richer
+ * item subclasses for weapons, consumables, passive gear, keys, and future utility items.
+ */
+final class DarkHoldsItems {
+
+    private DarkHoldsItems() {
+    }
+
+    public static StickItem stick() {
+        return new StickItem();
+    }
+
+    public static SwordItem sword() {
+        return new SwordItem();
+    }
+
+    public static TorchItem torch() {
+        return new TorchItem();
+    }
+
+    public static SmallPotionItem smallPotion() {
+        return new SmallPotionItem();
+    }
+
+    public static BigPotionItem bigPotion() {
+        return new BigPotionItem();
+    }
+
+    public static ScrollOfEscapeItem scrollOfEscape() {
+        return new ScrollOfEscapeItem();
+    }
+
+    public static ScrollOfFireballItem scrollOfFireball() {
+        return new ScrollOfFireballItem();
+    }
+
+    public static ScrollOfStealthItem scrollOfStealth() {
+        return new ScrollOfStealthItem();
+    }
+
+    public static ArmorItem armor() {
+        return new ArmorItem();
+    }
+
+    public static ShieldItem shield() {
+        return new ShieldItem();
+    }
+
+    public static KeyItem floorOneIronKey() {
+        return new KeyItem("locked_hall_iron_key", "Iron Key");
+    }
+
+    public static AncientRelicItem ancientRelic() {
+        return new AncientRelicItem();
+    }
+
+    public static BookOfSpellsItem bookOfSpells() {
+        return new BookOfSpellsItem();
+    }
+
+    public static int getPassiveAttackBonus(Player player) {
+        int total = 0;
+
+        for (Item item : player.getInventory()) {
+            if (item instanceof PassiveGearItem gear) {
+                total += gear.getPassiveAttackBonus();
+            }
+        }
+
+        return total;
+    }
+
+    public static int getPassiveDefenseBonus(Player player) {
+        int total = 0;
+
+        for (Item item : player.getInventory()) {
+            if (item instanceof PassiveGearItem gear) {
+                total += gear.getPassiveDefenseBonus();
+            }
+        }
+
+        return total;
+    }
+
+    public static boolean playerHasTorch(Player player) {
+        return player.hasItem("Torch");
+    }
+
+    public static WeaponItem findWeapon(Player player, String weaponName) {
+        for (Item item : player.getInventory()) {
+            if (item instanceof WeaponItem weapon && weapon.getName().equalsIgnoreCase(weaponName)) {
+                return weapon;
+            }
+        }
+
+        return null;
+    }
+}
+
+/**
+ * Context object passed into active item uses.
+ *
+ * The current prototype only needs a little context, but this leaves room for later battle,
+ * stealth, and room utility without rewriting the base item model again.
+ */
+class ItemContext {
+    private boolean inBattle;
+    private Enemy currentEnemy;
+    private String previousRoomId;
+    private String currentRoomId;
+    private boolean stealthActive;
+    private boolean battleEnded;
+    private boolean escapedByItem;
+    private boolean encounterBypassed;
+
+    public boolean isInBattle() {
+        return inBattle;
+    }
+
+    public void setInBattle(boolean inBattle) {
+        this.inBattle = inBattle;
+    }
+
+    public Enemy getCurrentEnemy() {
+        return currentEnemy;
+    }
+
+    public void setCurrentEnemy(Enemy currentEnemy) {
+        this.currentEnemy = currentEnemy;
+    }
+
+    public String getPreviousRoomId() {
+        return previousRoomId;
+    }
+
+    public void setPreviousRoomId(String previousRoomId) {
+        this.previousRoomId = previousRoomId;
+    }
+
+    public String getCurrentRoomId() {
+        return currentRoomId;
+    }
+
+    public void setCurrentRoomId(String currentRoomId) {
+        this.currentRoomId = currentRoomId;
+    }
+
+    public boolean isStealthActive() {
+        return stealthActive;
+    }
+
+    public void setStealthActive(boolean stealthActive) {
+        this.stealthActive = stealthActive;
+    }
+
+    public boolean isBattleEnded() {
+        return battleEnded;
+    }
+
+    public void setBattleEnded(boolean battleEnded) {
+        this.battleEnded = battleEnded;
+    }
+
+    public boolean isEscapedByItem() {
+        return escapedByItem;
+    }
+
+    public void setEscapedByItem(boolean escapedByItem) {
+        this.escapedByItem = escapedByItem;
+    }
+
+    public boolean isEncounterBypassed() {
+        return encounterBypassed;
+    }
+
+    public void setEncounterBypassed(boolean encounterBypassed) {
+        this.encounterBypassed = encounterBypassed;
+    }
+}
+
 class Item {
     private final String name;
     private final ItemType type;
@@ -1431,60 +1888,402 @@ enum ItemType {
     SPECIAL
 }
 
-enum EnemyType {
-    GOBLIN,
-    BAT,
-    WOLF,
-    SLIME,
-    SNAKE
-}
+/**
+ * Base subclass for richer item behavior.
+ *
+ * Only items that truly need extra logic use this layer. The rest can remain simple Item
+ * objects, so the prototype stays lightweight.
+ */
+abstract class GameItem extends Item {
+    private final String description;
 
-enum MoveEffect {
-    NONE,
-    POCKET_SAND,
-    CONSTRICT
-}
-
-enum BattleResult {
-    WON,
-    ESCAPED,
-    DIED
-}
-
-enum PlayerAction {
-    ATTACK,
-    TORCH,
-    ACTION,
-    INVENTORY,
-    RUN
-}
-
-class BattleTurnResult {
-    private final boolean turnConsumed;
-    private final boolean sandInEyes;
-    private final boolean consumeSandBlindness;
-    private final boolean dodgeActive;
-
-    public BattleTurnResult(boolean turnConsumed, boolean sandInEyes, boolean consumeSandBlindness, boolean dodgeActive) {
-        this.turnConsumed = turnConsumed;
-        this.sandInEyes = sandInEyes;
-        this.consumeSandBlindness = consumeSandBlindness;
-        this.dodgeActive = dodgeActive;
+    public GameItem(String name, ItemType type, int power, String description) {
+        super(name, type, power);
+        this.description = description;
     }
 
-    public boolean isTurnConsumed() {
-        return turnConsumed;
+    public String getDescription() {
+        return description;
     }
 
-    public boolean isSandInEyes() {
-        return sandInEyes;
+    public boolean canUseInBattle() {
+        return false;
     }
 
-    public boolean didConsumeSandBlindness() {
-        return consumeSandBlindness;
+    public boolean canUseOutsideBattle() {
+        return false;
     }
 
-    public boolean isDodgeActive() {
-        return dodgeActive;
+    public boolean isPassive() {
+        return false;
+    }
+
+    /**
+     * Return true when the item should be removed after a successful use.
+     */
+    public boolean use(Player player, ItemContext context) {
+        System.out.println(getName() + " has no active use.");
+        return false;
+    }
+
+    public int getPassiveAttackBonus() {
+        return 0;
+    }
+
+    public int getPassiveDefenseBonus() {
+        return 0;
+    }
+
+    public boolean grantsParry() {
+        return false;
+    }
+}
+
+/**
+ * Rich weapon item used for attack menu actions and inventory attack duplication.
+ */
+abstract class WeaponItem extends GameItem {
+    private final int accuracy;
+    private final String attackName;
+
+    public WeaponItem(String name, int power, int accuracy, String attackName, String description) {
+        super(name, ItemType.WEAPON, power, description);
+        this.accuracy = accuracy;
+        this.attackName = attackName;
+    }
+
+    public int getAccuracy() {
+        return accuracy;
+    }
+
+    public String getAttackName() {
+        return attackName;
+    }
+
+    public int getDamageAgainst(Enemy enemy, Player player) {
+        if (enemy == null) {
+            return Math.max(1, getPower());
+        }
+
+        return Math.max(1, getPower() + player.getAttack() - enemy.getDefense());
+    }
+
+    public boolean allowsDarkRoomEntry() {
+        return false;
+    }
+}
+
+/**
+ * Passive gear grants stat bonuses simply by being carried.
+ */
+abstract class PassiveGearItem extends GameItem {
+    private final int passiveAttackBonus;
+    private final int passiveDefenseBonus;
+    private final boolean parryEnabled;
+
+    public PassiveGearItem(String name, String description,
+                           int passiveAttackBonus, int passiveDefenseBonus, boolean parryEnabled) {
+        super(name, ItemType.SPECIAL, 0, description);
+        this.passiveAttackBonus = passiveAttackBonus;
+        this.passiveDefenseBonus = passiveDefenseBonus;
+        this.parryEnabled = parryEnabled;
+    }
+
+    @Override
+    public boolean isPassive() {
+        return true;
+    }
+
+    @Override
+    public int getPassiveAttackBonus() {
+        return passiveAttackBonus;
+    }
+
+    @Override
+    public int getPassiveDefenseBonus() {
+        return passiveDefenseBonus;
+    }
+
+    @Override
+    public boolean grantsParry() {
+        return parryEnabled;
+    }
+}
+
+/* ---------------------
+   ITEM SUBSECTION - POTIONS
+   --------------------- */
+
+class SmallPotionItem extends GameItem {
+    private static final int HEAL_AMOUNT = 15;
+
+    public SmallPotionItem() {
+        super("Small Potion", ItemType.HEALING, HEAL_AMOUNT,
+                "Heals 15 HP. Can be used in or out of battle.");
+    }
+
+    @Override
+    public boolean canUseInBattle() {
+        return true;
+    }
+
+    @Override
+    public boolean canUseOutsideBattle() {
+        return true;
+    }
+
+    @Override
+    public boolean use(Player player, ItemContext context) {
+        int before = player.getHp();
+        player.heal(HEAL_AMOUNT);
+        int healed = player.getHp() - before;
+        System.out.println("You use " + getName() + " and restore " + healed + " HP.");
+        return true;
+    }
+}
+
+class BigPotionItem extends GameItem {
+    private static final int HEAL_AMOUNT = 40;
+
+    public BigPotionItem() {
+        super("Big Potion", ItemType.HEALING, HEAL_AMOUNT,
+                "Heals 40 HP. Can be used in or out of battle.");
+    }
+
+    @Override
+    public boolean canUseInBattle() {
+        return true;
+    }
+
+    @Override
+    public boolean canUseOutsideBattle() {
+        return true;
+    }
+
+    @Override
+    public boolean use(Player player, ItemContext context) {
+        int before = player.getHp();
+        player.heal(HEAL_AMOUNT);
+        int healed = player.getHp() - before;
+        System.out.println("Used Big Potion. Restored " + healed + " HP.");
+        return true;
+    }
+}
+
+/* ---------------------
+   ITEM SUBSECTION - SCROLLS
+   --------------------- */
+
+class ScrollOfEscapeItem extends GameItem {
+    public ScrollOfEscapeItem() {
+        super("Scroll of Escape", ItemType.SPECIAL, 0,
+                "Use during battle to escape back to the previous room.");
+    }
+
+    @Override
+    public boolean canUseInBattle() {
+        return true;
+    }
+
+    @Override
+    public boolean use(Player player, ItemContext context) {
+        if (context == null || !context.isInBattle()) {
+            System.out.println("Scroll of Escape can only be used during battle.");
+            return false;
+        }
+
+        if (context.getPreviousRoomId() == null) {
+            System.out.println("No previous room exists.");
+            return false;
+        }
+
+        player.setCurrentRoom(context.getPreviousRoomId());
+        context.setCurrentRoomId(context.getPreviousRoomId());
+        context.setCurrentEnemy(null);
+        context.setInBattle(false);
+        context.setBattleEnded(true);
+        context.setEscapedByItem(true);
+
+        System.out.println("You used Scroll of Escape and fled to the previous room.");
+        return true;
+    }
+}
+
+class ScrollOfFireballItem extends GameItem {
+    private static final int FIREBALL_DAMAGE = 35;
+
+    public ScrollOfFireballItem() {
+        super("Scroll of Fireball", ItemType.SPECIAL, FIREBALL_DAMAGE,
+                "Deals 35 damage to the current enemy during battle.");
+    }
+
+    @Override
+    public boolean canUseInBattle() {
+        return true;
+    }
+
+    @Override
+    public boolean use(Player player, ItemContext context) {
+        if (context == null || !context.isInBattle() || context.getCurrentEnemy() == null) {
+            System.out.println("Scroll of Fireball can only be used during battle.");
+            return false;
+        }
+
+        context.getCurrentEnemy().takeDamage(FIREBALL_DAMAGE);
+        System.out.println("Fireball hits " + context.getCurrentEnemy().getName()
+                + " for " + FIREBALL_DAMAGE + " damage.");
+        return true;
+    }
+}
+
+class ScrollOfStealthItem extends GameItem {
+    public ScrollOfStealthItem() {
+        super("Scroll of Stealth", ItemType.SPECIAL, 0,
+                "Use before battle to sneak past the next non-boss fight.");
+    }
+
+    @Override
+    public boolean canUseOutsideBattle() {
+        return true;
+    }
+
+    @Override
+    public boolean use(Player player, ItemContext context) {
+        if (context == null) {
+            System.out.println("Stealth cannot be applied without room context.");
+            return false;
+        }
+
+        if (context.isInBattle()) {
+            System.out.println("Scroll of Stealth must be used before battle starts.");
+            return false;
+        }
+
+        if (context.getCurrentEnemy() != null && context.getCurrentEnemy().getType() == EnemyType.SNAKE) {
+            System.out.println("Scroll of Stealth cannot bypass a boss encounter.");
+            return false;
+        }
+
+        context.setStealthActive(true);
+        context.setEncounterBypassed(true);
+        System.out.println("Stealth activated. You may bypass the next non-boss encounter.");
+        return true;
+    }
+}
+
+/* ---------------------
+   ITEM SUBSECTION - WEAPONS
+   --------------------- */
+
+class StickItem extends WeaponItem {
+    public StickItem() {
+        super("Stick", 2, 95, "Stick Attack",
+                "Default weapon. Weak but reliable.");
+    }
+
+    @Override
+    public int getDamageAgainst(Enemy enemy, Player player) {
+        if (enemy != null && enemy.getType() == EnemyType.SLIME) {
+            return 2;
+        }
+
+        return Math.max(1, getPower() + player.getAttack() - enemy.getDefense());
+    }
+}
+
+class SwordItem extends WeaponItem {
+    public SwordItem() {
+        super("Sword", 8, 90, "Sword Slash",
+                "Stronger weapon that can later appear as its own combat action.");
+    }
+}
+
+class TorchItem extends WeaponItem {
+    public TorchItem() {
+        super("Torch", 4, 80, "Torch",
+                "Weapon and utility item. Strong against slime and useful for dark rooms later.");
+    }
+
+    @Override
+    public int getDamageAgainst(Enemy enemy, Player player) {
+        if (enemy != null && enemy.getType() == EnemyType.SLIME) {
+            return Math.max(10, getPower() + player.getAttack() - enemy.getDefense() + 6);
+        }
+
+        return Math.max(1, getPower() + player.getAttack() - enemy.getDefense());
+    }
+
+    @Override
+    public boolean allowsDarkRoomEntry() {
+        return true;
+    }
+}
+
+/* ---------------------
+   ITEM SUBSECTION - PASSIVE GEAR
+   --------------------- */
+
+class ArmorItem extends PassiveGearItem {
+    public ArmorItem() {
+        super("Armor", "Passive +6 Defense while carried.", 0, 6, false);
+    }
+}
+
+class ShieldItem extends PassiveGearItem {
+    public ShieldItem() {
+        super("Shield", "Passive +3 Defense while carried. Also supports future Parry work.", 0, 3, true);
+    }
+}
+
+/* ---------------------
+   ITEM SUBSECTION - KEYS AND SPECIALS
+   --------------------- */
+
+class KeyItem extends GameItem {
+    private final String keyId;
+
+    public KeyItem(String keyId, String displayName) {
+        super(displayName, ItemType.SPECIAL, 0,
+                "Used automatically when checking locked doors. Key ID: " + keyId);
+        this.keyId = keyId;
+    }
+
+    public String getKeyId() {
+        return keyId;
+    }
+}
+
+class AncientRelicItem extends GameItem {
+    public AncientRelicItem() {
+        super("Ancient Relic", ItemType.SPECIAL, 0,
+                "Placeholder reward item. No active function yet.");
+    }
+}
+
+class BookOfSpellsItem extends GameItem {
+    private final ArrayList<String> storedSpells = new ArrayList<>();
+
+    public BookOfSpellsItem() {
+        super("Book of Spells", ItemType.SPECIAL, 0,
+                "Placeholder item. Planned for storing learned spells later.");
+    }
+
+    public void addSpell(String spellName) {
+        storedSpells.add(spellName);
+    }
+
+    public ArrayList<String> getStoredSpells() {
+        return storedSpells;
+    }
+
+    @Override
+    public boolean canUseOutsideBattle() {
+        return true;
+    }
+
+    @Override
+    public boolean use(Player player, ItemContext context) {
+        System.out.println("Book of Spells is not finished yet.");
+        return false;
     }
 }
