@@ -1,0 +1,420 @@
+Dark Holds Master Build Breakdown
+=================================
+
+Files in this folder
+--------------------
+1. DarkHoldsFloor1PrototypeMasterBuild.java
+   - Single-file master source build.
+   - This merges the current modular Floor 1 room structure, the item bank, and the bestiary bank into one compile-ready file.
+2. MASTER_BUILD_BREAKDOWN.txt
+   - This description file.
+
+Compile / Run
+-------------
+Compile:
+  javac DarkHoldsFloor1PrototypeMasterBuild.java
+Run:
+  java DarkHoldsFloor1PrototypeMasterBuild
+
+Current build overview
+----------------------
+This build keeps the newer modular Floor 1 structure and merges all support code into one file.
+It is still a prototype build, so several systems and content entries exist in code before they are fully placed into rooms.
+
+Current Floor 1 structure in use
+--------------------------------
+The current floor generator uses the newer modular 6-room skeleton:
+- f1safe: Safe Room
+- r2: one random puzzle-slot room
+  - Broken Fork OR Serpent Shrine
+- r3: one random fight-slot room
+  - Bat Roost OR Goblin Trail OR Damp Tunnel
+- f1lockedHall: Locked Hallway
+- r5: one random remaining-pool room
+  - leftover puzzle room, leftover fight room, Empty Cache, or Snake Hoard
+- f1snakeBoss: Serpent Lair
+
+Rewards currently placed by code
+--------------------------------
+- Iron Key: placed in one key-eligible room
+- Torch: placed in one pre-lock room other than Safe Room
+- Small Potion x3: placed in up to three pre-lock rooms
+- Ancient Relic: placed on the boss room in this build
+- Extra boss gold: 25 to 50 gold on the boss room
+
+Player progression currently in use
+-----------------------------------
+Levels supported: 1 through 13
+XP thresholds to reach each level:
+- Level 1: 0 XP
+- Level 2: 12 XP
+- Level 3: 26 XP
+- Level 4: 42 XP
+- Level 5: 60 XP
+- Level 6: 82 XP
+- Level 7: 108 XP
+- Level 8: 138 XP
+- Level 9: 172 XP
+- Level 10: 210 XP
+- Level 11: 252 XP
+- Level 12: 298 XP
+- Level 13: 348 XP
+
+Player stat progression:
+- HP by level: 50, 54, 58, 62, 66, 70, 74, 79, 84, 88, 92, 96, 100
+- Attack by level: 8, 8, 9, 9, 10, 10, 11, 12, 12, 13, 14, 15, 16
+- Defense by level: 2, 2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 6, 6
+
+Combat systems currently in use
+-------------------------------
+- Basic damage formula:
+  player damage = max(1, movePower + playerAttack - enemyDefense)
+  enemy damage  = max(1, movePower + enemyAttack - playerDefense)
+- Pocket Sand still always does 1 damage on hit.
+- Constrict still applies the snake constrict state and follow-up damage.
+- Dodge is active in battle.
+- Parry is coded and active only if the player has an item that grants parry.
+- Most physical attacks are marked parryable.
+- Light, status, and magic attacks are usually not parryable.
+- Constrict is explicitly not parryable.
+
+Item bank summary
+-----------------
+All of the following item classes exist in the master file.
+
+1. Stick
+   - Type: WEAPON
+   - Power: 2
+   - Accuracy: 95
+   - Attack name: Stick Attack
+   - Use: default starter weapon
+   - Special rule: only deals 2 damage to Slime
+   - Currently used in build: YES (player starts with it)
+
+2. Sword
+   - Type: WEAPON
+   - Power: 8
+   - Accuracy: 90
+   - Attack name: Sword Slash
+   - Use: stronger weapon for later use
+   - Currently used in build: NO
+
+3. Torch
+   - Type: WEAPON
+   - Power: 4
+   - Accuracy: 80
+   - Attack name: Torch
+   - Use: battle weapon and future dark-room utility item
+   - Special rule vs Slime: deals boosted damage, minimum 10 and then extra bonus from formula
+   - Currently used in build: YES (distributed as loot)
+
+4. Small Potion
+   - Type: HEALING
+   - Power / Heal amount: 15 HP
+   - Use: usable in and out of battle
+   - Removed after use: YES
+   - Currently used in build: YES (distributed as loot)
+
+5. Big Potion
+   - Type: HEALING
+   - Power / Heal amount: 40 HP
+   - Use: usable in and out of battle
+   - Removed after use: YES
+   - Currently used in build: NO
+
+6. Scroll of Escape
+   - Type: SPECIAL
+   - Power: 0
+   - Use: usable in battle to escape to previous room
+   - Removed after use: YES
+   - Currently used in build: NO
+
+7. Scroll of Fireball
+   - Type: SPECIAL
+   - Power / Damage: 35
+   - Use: usable in battle to deal 35 damage to current enemy
+   - Removed after use: YES
+   - Currently used in build: NO
+
+8. Scroll of Stealth
+   - Type: SPECIAL
+   - Power: 0
+   - Intended use: usable outside battle to bypass the next non-boss encounter
+   - Current state: item exists, but the floor/game loop does not yet consume the stealth flag, so the effect is not fully wired
+   - Currently used in build: NO
+
+9. Armor
+   - Type: SPECIAL (passive gear)
+   - Passive bonus: +6 Defense while carried
+   - Use: future passive gear
+   - Currently used in build: NO
+
+10. Shield
+    - Type: SPECIAL (passive gear)
+    - Passive bonus: +3 Defense while carried
+    - Grants parry: YES
+    - Use: future passive gear and parry enabler
+    - Currently used in build: NO
+
+11. Iron Key
+    - Type: SPECIAL
+    - Use: unlocks locked hallway automatically when carried in key collection
+    - Currently used in build: YES (distributed as reward)
+
+12. Ancient Relic
+    - Type: SPECIAL
+    - Use: placeholder reward item, no active effect yet
+    - Currently used in build: YES (boss reward)
+
+13. Book of Spells
+    - Type: SPECIAL
+    - Use: placeholder spell-storage item
+    - Current state: can store spell names, but gameplay does not yet use it for anything meaningful
+    - Currently used in build: NO
+
+Item helper / support code also present
+--------------------------------------
+- DarkHoldsItems factory/helper class
+- ItemContext support object for item use context
+- GameItem / WeaponItem / PassiveGearItem base classes
+- Passive attack and defense bonus helper methods
+
+Bestiary summary
+----------------
+All of the following enemy classes exist in the master file.
+
+Tier 1 enemies
+~~~~~~~~~~~~~~
+1. Bat
+   - Intended tier/floors: Tier 1 / early floors
+   - HP: 14
+   - Attack: 4
+   - Defense: 1
+   - XP reward: 7
+   - Gold reward: 1 to 4
+   - Moves:
+     * Bite | Power 1 | Accuracy 84 | Type LIGHT | Parryable NO | Effect NONE
+     * Wing Buffet | Power 2 | Accuracy 74 | Type NORMAL | Parryable YES | Effect NONE
+     * Screech | Power 1 | Accuracy 78 | Type STATUS | Parryable NO | Effect NONE
+   - Currently used in build: YES (possible Floor 1 fight-slot room)
+
+2. Goblin
+   - Intended tier/floors: Tier 1 / early floors
+   - HP: 20
+   - Attack: 5
+   - Defense: 2
+   - XP reward: 10
+   - Gold reward: 4 to 8
+   - Moves:
+     * Knife Stab | Power 2 | Accuracy 80 | Type LIGHT | Parryable NO | Effect NONE
+     * Wild Swing | Power 4 | Accuracy 58 | Type NORMAL | Parryable YES | Effect NONE
+     * Pocket Sand | Power 0 | Accuracy 52 | Type STATUS | Parryable NO | Effect POCKET_SAND (50% blind chance)
+   - Currently used in build: YES (possible Floor 1 fight-slot room)
+
+3. Wolf
+   - Intended tier/floors: Tier 1 / early floors
+   - HP: 24
+   - Attack: 6
+   - Defense: 2
+   - XP reward: 13
+   - Gold reward: 4 to 7
+   - Moves:
+     * Snap Bite | Power 2 | Accuracy 82 | Type LIGHT | Parryable NO | Effect NONE
+     * Lunge | Power 4 | Accuracy 68 | Type NORMAL | Parryable YES | Effect NONE
+     * Pounce | Power 5 | Accuracy 56 | Type HEAVY | Parryable YES | Effect NONE
+   - Currently used in build: NO
+
+Tier 2 enemies
+~~~~~~~~~~~~~~
+4. Slime
+   - Intended tier/floors: Tier 2 / early-mid floors or special tougher early encounter
+   - HP: 42
+   - Attack: 4
+   - Defense: 5
+   - XP reward: 20
+   - Gold reward: 8 to 15
+   - Moves:
+     * Slam | Power 2 | Accuracy 76 | Type NORMAL | Parryable YES | Effect NONE
+     * Body Press | Power 4 | Accuracy 62 | Type HEAVY | Parryable YES | Effect NONE
+     * Acid Splash | Power 3 | Accuracy 70 | Type MAGIC | Parryable NO | Effect NONE
+   - Special player interaction: Torch is strong against Slime
+   - Currently used in build: YES (possible Floor 1 fight-slot room)
+
+5. Skeleton
+   - Intended tier/floors: Tier 2 / middle floors
+   - HP: 30
+   - Attack: 7
+   - Defense: 4
+   - XP reward: 17
+   - Gold reward: 6 to 10
+   - Moves:
+     * Rusty Slash | Power 3 | Accuracy 78 | Type NORMAL | Parryable YES | Effect NONE
+     * Shield Bash | Power 5 | Accuracy 62 | Type HEAVY | Parryable YES | Effect NONE
+     * Bone Rattle | Power 1 | Accuracy 74 | Type STATUS | Parryable NO | Effect NONE
+   - Currently used in build: NO
+
+6. Orc
+   - Intended tier/floors: Tier 2 / middle floors
+   - HP: 34
+   - Attack: 8
+   - Defense: 3
+   - XP reward: 19
+   - Gold reward: 8 to 14
+   - Moves:
+     * Axe Chop | Power 4 | Accuracy 76 | Type NORMAL | Parryable YES | Effect NONE
+     * Cleaver Drop | Power 6 | Accuracy 58 | Type HEAVY | Parryable YES | Effect NONE
+     * War Cry | Power 2 | Accuracy 80 | Type STATUS | Parryable NO | Effect NONE
+   - Currently used in build: NO
+
+Tier 3 enemies
+~~~~~~~~~~~~~~
+7. Ogre
+   - Intended tier/floors: Tier 3 / later floors
+   - HP: 52
+   - Attack: 11
+   - Defense: 4
+   - XP reward: 30
+   - Gold reward: 12 to 20
+   - Moves:
+     * Club Smash | Power 7 | Accuracy 60 | Type HEAVY | Parryable YES | Effect NONE
+     * Backhand | Power 4 | Accuracy 74 | Type NORMAL | Parryable YES | Effect NONE
+     * Ground Stomp | Power 3 | Accuracy 82 | Type STATUS | Parryable NO | Effect NONE
+   - Currently used in build: NO
+
+8. Cave Troll
+   - Intended tier/floors: Tier 3 / later floors
+   - HP: 64
+   - Attack: 12
+   - Defense: 6
+   - XP reward: 36
+   - Gold reward: 15 to 24
+   - Moves:
+     * Maul | Power 7 | Accuracy 66 | Type HEAVY | Parryable YES | Effect NONE
+     * Crushing Grab | Power 5 | Accuracy 62 | Type GRAPPLE | Parryable YES | Effect NONE
+     * Regenerate | Power 0 | Accuracy 100 | Type STATUS | Parryable NO | Effect SELF_HEAL (8 HP)
+   - Currently used in build: NO
+
+Bosses
+~~~~~~
+9. Giant Snake
+   - Intended tier/floors: Floor 1 boss
+   - HP: 34
+   - Attack: 8
+   - Defense: 3
+   - XP reward: 42
+   - Gold reward: 15 to 25
+   - Moves:
+     * Bite | Power 3 | Accuracy 78 | Type LIGHT | Parryable NO | Effect NONE
+     * Tail Lash | Power 5 | Accuracy 54 | Type NORMAL | Parryable YES | Effect NONE
+     * Constrict | Power 2 | Accuracy 60 | Type GRAPPLE | Parryable NO | Effect CONSTRICT (100%)
+   - Currently used in build: YES (Floor 1 boss)
+
+10. Necromancer
+    - Intended tier/floors: later boss / endgame boss candidate
+    - HP: 86
+    - Attack: 13
+    - Defense: 7
+    - XP reward: 80
+    - Gold reward: 40 to 60
+    - Moves:
+      * Bone Spear | Power 7 | Accuracy 84 | Type MAGIC | Parryable NO | Effect NONE
+      * Grave Lash | Power 5 | Accuracy 76 | Type NORMAL | Parryable YES | Effect NONE
+      * Soul Drain | Power 5 | Accuracy 72 | Type MAGIC | Parryable NO | Effect SOUL_DRAIN (heals 5 HP)
+      * Raise Dead | Power 0 | Accuracy 100 | Type STATUS | Parryable NO | Effect SELF_HEAL (10 HP)
+      * Black Flame | Power 8 | Accuracy 64 | Type MAGIC | Parryable NO | Effect NONE
+    - Currently used in build: NO
+
+Move types currently defined
+----------------------------
+- LIGHT
+- NORMAL
+- HEAVY
+- GRAPPLE
+- STATUS
+- MAGIC
+
+Move effects currently defined
+-----------------------------
+- NONE
+- POCKET_SAND
+- CONSTRICT
+- SELF_HEAL
+- SOUL_DRAIN
+
+What is in the code but not actively used yet
+---------------------------------------------
+1. Advanced enemy roster not yet placed into Floor 1
+   - Wolf, Skeleton, Orc, Ogre, Cave Troll, Necromancer all exist, but the current Floor 1 generator does not spawn them.
+
+2. Several items are defined but not currently awarded or sold
+   - Sword
+   - Big Potion
+   - Scroll of Escape
+   - Scroll of Fireball
+   - Scroll of Stealth
+   - Armor
+   - Shield
+   - Book of Spells
+
+3. Parry is coded, but not showcased by current loot
+   - The battle system supports parry.
+   - The player only gets access to parry if carrying an item that grants parry.
+   - Shield grants parry, but the current Floor 1 build does not place a shield.
+
+4. Scroll of Stealth support is incomplete
+   - ItemContext tracks stealth state and encounter bypass flags.
+   - The game loop does not currently check those flags to skip encounters.
+   - Result: Scroll of Stealth exists as designed content, but is not fully wired into room/battle flow yet.
+
+5. Dark-room support is not active yet
+   - TorchItem defines allowsDarkRoomEntry().
+   - No room logic currently checks for dark-room access, so this utility flag is unused.
+
+6. Book of Spells is a placeholder
+   - It can store spell names in an ArrayList.
+   - No gameplay system currently reads or uses stored spells.
+
+7. Shield helper methods are mostly legacy / optional right now
+   - ShieldItem still has helper methods like enablesParry(), getBattleActionName(), parryDamage(), and getParryResultMessage().
+   - The actual battle loop now uses the generic GameItem.grantsParry() flag and EnemyMove.isParryable().
+   - Result: those shield-specific helper methods may be removable later unless the team wants to reuse them.
+
+8. Puzzle rooms are label-only for now
+   - Broken Fork and Serpent Shrine exist as puzzle-slot rooms in Floor 1.
+   - They currently provide flavor text only.
+   - No true puzzle or riddle resolution logic is implemented yet.
+
+9. Snake Hoard is no longer a true post-boss room in this build
+   - In the current modular 6-room structure, Snake Hoard can appear as a general-pool room before the boss.
+   - It is not currently used as a separate post-boss payout room.
+   - Boss rewards are attached directly to the boss room instead.
+
+10. Floor 2 is not present in code here
+   - This master build contains only the current Floor 1 prototype.
+   - Future floor work still needs to be added later.
+
+Possible clean-up targets at the end of the project
+---------------------------------------------------
+These are candidates to remove if the team decides not to use them:
+- Scroll of Stealth support fields in ItemContext if stealth never gets wired in
+- Shield helper methods if the generic parry system replaces them completely
+- Book of Spells if no spell-inventory system is built
+- Dark-room utility hooks if no dark rooms are added
+- Unused enemy factory methods if the final game scope stays smaller
+- Puzzle-slot labeling if no puzzle mechanics are added
+
+Quick planning notes for the floor-builder teammate
+---------------------------------------------------
+What she currently has available to work with:
+- Early enemies: Bat, Goblin, Wolf
+- Mid enemies: Slime, Skeleton, Orc
+- Late enemies: Ogre, Cave Troll
+- Boss options: Giant Snake, Necromancer
+- Starter / support loot already coded: Stick, Torch, Small Potion, Key, Relic
+- Future loot already coded: Sword, Big Potion, scrolls, Armor, Shield, Book of Spells
+- Battle interaction types already coded: dodge, run, item use, parry-ready move typing
+
+Bottom line
+-----------
+This master build is intentionally larger than the currently played content.
+It already contains a chunk of future-facing systems and content so the team can expand floors without re-adding the same classes later.
