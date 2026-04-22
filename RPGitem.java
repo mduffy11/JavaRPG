@@ -1,0 +1,669 @@
+import java.util.ArrayList;
+
+/**
+ * RPGitemsONLY_fixed.java
+ * --------------------------------
+ * Item-only support file for the Dark Holds prototype.
+ *
+ * This file is meant to be attached to the main prototype so the main game can
+ * pull item objects directly from here.
+ *
+ * Assumes the main prototype already defines:
+ * - Item
+ * - ItemType
+ * - Player
+ * - Enemy
+ * - EnemyType
+ */
+
+/* =====================================================
+   ITEM FACTORY / HELPER
+   ===================================================== */
+
+final class DarkHoldsItems {
+
+    private DarkHoldsItems() {
+    }
+
+    public static StickItem stick() {
+        return new StickItem();
+    }
+
+    public static SwordItem sword() {
+        return new SwordItem();
+    }
+
+    public static GreatSwordItem greatSword() {
+        return new GreatSwordItem();
+    }
+
+    public static TorchItem torch() {
+        return new TorchItem();
+    }
+
+    public static SmallPotionItem smallPotion() {
+        return new SmallPotionItem();
+    }
+
+    public static BigPotionItem bigPotion() {
+        return new BigPotionItem();
+    }
+
+    public static ScrollOfEscapeItem scrollOfEscape() {
+        return new ScrollOfEscapeItem();
+    }
+
+    public static ScrollOfFireballItem scrollOfFireball() {
+        return new ScrollOfFireballItem();
+    }
+
+    public static ScrollOfStealthItem scrollOfStealth() {
+        return new ScrollOfStealthItem();
+    }
+
+    public static ArmorItem armor() {
+        return new ArmorItem();
+    }
+
+    public static ShieldItem shield() {
+        return new ShieldItem();
+    }
+
+    public static DragonScaleShieldItem dragonScale() {
+        return new DragonScaleShieldItem();
+    }
+
+    public static KeyItem floorOneIronKey() {
+        return new KeyItem("locked_hall_iron_key", "Iron Key");
+    }
+
+    public static KeyItem ancientRelic() {
+        return new KeyItem("dragon_lair_secret_door", "Ancient Relic");
+    }
+
+    public static int getPassiveAttackBonus(Player player) {
+        int total = 0;
+
+        for (Item item : player.getInventory()) {
+            if (item instanceof PassiveGearItem gear) {
+                total += gear.getPassiveAttackBonus();
+            }
+        }
+
+        return total;
+    }
+
+    public static int getPassiveDefenseBonus(Player player) {
+        int total = 0;
+
+        for (Item item : player.getInventory()) {
+            if (item instanceof PassiveGearItem gear) {
+                total += gear.getPassiveDefenseBonus();
+            }
+        }
+
+        return total;
+    }
+
+    public static boolean playerHasTorch(Player player) {
+        return player.hasItem("Torch");
+    }
+
+    public static WeaponItem findWeapon(Player player, String weaponName) {
+        for (Item item : player.getInventory()) {
+            if (item instanceof WeaponItem weapon && item.getName().equalsIgnoreCase(weaponName)) {
+                return weapon;
+            }
+        }
+        return null;
+    }
+}
+
+/* =====================================================
+   ITEM CONTEXT
+   ===================================================== */
+
+class ItemContext {
+    private boolean inBattle;
+    private Enemy currentEnemy;
+    private String previousRoomId;
+    private String currentRoomId;
+    private boolean stealthActive;
+    private boolean battleEnded;
+    private boolean escapedByItem;
+    private boolean encounterBypassed;
+
+    public boolean isInBattle() {
+        return inBattle;
+    }
+
+    public void setInBattle(boolean inBattle) {
+        this.inBattle = inBattle;
+    }
+
+    public Enemy getCurrentEnemy() {
+        return currentEnemy;
+    }
+
+    public void setCurrentEnemy(Enemy currentEnemy) {
+        this.currentEnemy = currentEnemy;
+    }
+
+    public String getPreviousRoomId() {
+        return previousRoomId;
+    }
+
+    public void setPreviousRoomId(String previousRoomId) {
+        this.previousRoomId = previousRoomId;
+    }
+
+    public String getCurrentRoomId() {
+        return currentRoomId;
+    }
+
+    public void setCurrentRoomId(String currentRoomId) {
+        this.currentRoomId = currentRoomId;
+    }
+
+    public boolean isStealthActive() {
+        return stealthActive;
+    }
+
+    public void setStealthActive(boolean stealthActive) {
+        this.stealthActive = stealthActive;
+    }
+
+    public boolean isBattleEnded() {
+        return battleEnded;
+    }
+
+    public void setBattleEnded(boolean battleEnded) {
+        this.battleEnded = battleEnded;
+    }
+
+    public boolean isEscapedByItem() {
+        return escapedByItem;
+    }
+
+    public void setEscapedByItem(boolean escapedByItem) {
+        this.escapedByItem = escapedByItem;
+    }
+
+    public boolean isEncounterBypassed() {
+        return encounterBypassed;
+    }
+
+    public void setEncounterBypassed(boolean encounterBypassed) {
+        this.encounterBypassed = encounterBypassed;
+    }
+}
+
+/* =====================================================
+   BASE ITEM CLASSES
+   ===================================================== */
+
+abstract class GameItem extends Item {
+    private final String description;
+
+    public GameItem(String name, ItemType type, int power, String description) {
+        super(name, type, power);
+        this.description = description;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public boolean canUseInBattle() {
+        return false;
+    }
+
+    public boolean canUseOutsideBattle() {
+        return false;
+    }
+
+    public boolean isPassive() {
+        return false;
+    }
+
+    public boolean use(Player player, ItemContext context) {
+        System.out.println(getName() + " has no active use.");
+        return false;
+    }
+
+    public int getPassiveAttackBonus() {
+        return 0;
+    }
+
+    public int getPassiveDefenseBonus() {
+        return 0;
+    }
+
+    public boolean grantsParry() {
+        return false;
+    }
+
+    @Override
+    public String toString() {
+        return getName() + " - " + description;
+    }
+}
+
+abstract class WeaponItem extends GameItem {
+    private final int accuracy;
+    private final String attackName;
+
+    public WeaponItem(String name, int power, int accuracy, String attackName, String description) {
+        super(name, ItemType.WEAPON, power, description);
+        this.accuracy = accuracy;
+        this.attackName = attackName;
+    }
+
+    public int getAccuracy() {
+        return accuracy;
+    }
+
+    public String getAttackName() {
+        return attackName;
+    }
+
+    public int getDamageAgainst(Enemy enemy, Player player) {
+        if (enemy == null) {
+            return Math.max(1, getPower());
+        }
+
+        return Math.max(1, getPower() + player.getAttack() - enemy.getDefense());
+    }
+
+    public boolean allowsDarkRoomEntry() {
+        return false;
+    }
+}
+
+abstract class PassiveGearItem extends GameItem {
+    private final int passiveAttackBonus;
+    private final int passiveDefenseBonus;
+    private final boolean parryEnabled;
+
+    public PassiveGearItem(String name, String description,
+                           int passiveAttackBonus, int passiveDefenseBonus, boolean parryEnabled) {
+        super(name, ItemType.SPECIAL, 0, description);
+        this.passiveAttackBonus = passiveAttackBonus;
+        this.passiveDefenseBonus = passiveDefenseBonus;
+        this.parryEnabled = parryEnabled;
+    }
+
+    @Override
+    public boolean isPassive() {
+        return true;
+    }
+
+    @Override
+    public int getPassiveAttackBonus() {
+        return passiveAttackBonus;
+    }
+
+    @Override
+    public int getPassiveDefenseBonus() {
+        return passiveDefenseBonus;
+    }
+
+    @Override
+    public boolean grantsParry() {
+        return parryEnabled;
+    }
+}
+
+/* =====================================================
+   POTIONS
+   ===================================================== */
+
+class SmallPotionItem extends GameItem {
+    private static final int HEAL_AMOUNT = 15;
+
+    public SmallPotionItem() {
+        super("Small Potion", ItemType.HEALING, HEAL_AMOUNT,
+                "Heals 15 HP. Can be used in or out of battle.");
+    }
+
+    @Override
+    public boolean canUseInBattle() {
+        return true;
+    }
+
+    @Override
+    public boolean canUseOutsideBattle() {
+        return true;
+    }
+
+    @Override
+    public boolean use(Player player, ItemContext context) {
+        int before = player.getHp();
+        player.heal(HEAL_AMOUNT);
+        int healed = player.getHp() - before;
+        System.out.println("You use " + getName() + " and restore " + healed + " HP.");
+        return true;
+    }
+}
+
+class BigPotionItem extends GameItem {
+    private static final int HEAL_AMOUNT = 40;
+
+    public BigPotionItem() {
+        super("Big Potion", ItemType.HEALING, HEAL_AMOUNT,
+                "Heals 40 HP. Can be used in or out of battle.");
+    }
+
+    @Override
+    public boolean canUseInBattle() {
+        return true;
+    }
+
+    @Override
+    public boolean canUseOutsideBattle() {
+        return true;
+    }
+
+    @Override
+    public boolean use(Player player, ItemContext context) {
+        int before = player.getHp();
+        player.heal(HEAL_AMOUNT);
+        int healed = player.getHp() - before;
+        System.out.println("Used Big Potion. Restored " + healed + " HP.");
+        return true;
+    }
+}
+
+/* =====================================================
+   SCROLLS
+   ===================================================== */
+
+class ScrollOfEscapeItem extends GameItem {
+    public ScrollOfEscapeItem() {
+        super("Scroll of Escape", ItemType.SPECIAL, 0,
+                "Use during battle to escape back to the previous room.");
+    }
+
+    @Override
+    public boolean canUseInBattle() {
+        return true;
+    }
+
+    @Override
+    public boolean use(Player player, ItemContext context) {
+        if (context == null || !context.isInBattle()) {
+            System.out.println("Scroll of Escape can only be used during battle.");
+            return false;
+        }
+
+        if (context.getPreviousRoomId() == null) {
+            System.out.println("No previous room exists.");
+            return false;
+        }
+
+        player.setCurrentRoom(context.getPreviousRoomId());
+        context.setCurrentRoomId(context.getPreviousRoomId());
+        context.setCurrentEnemy(null);
+        context.setInBattle(false);
+        context.setBattleEnded(true);
+        context.setEscapedByItem(true);
+
+        System.out.println("You used Scroll of Escape and fled to the previous room.");
+        return true;
+    }
+}
+
+class ScrollOfFireballItem extends GameItem {
+    private static final int FIREBALL_DAMAGE = 25;
+
+    public ScrollOfFireballItem() {
+        super("Scroll of Fireball", ItemType.SPECIAL, FIREBALL_DAMAGE,
+                "Deals 25 damage to the current enemy during battle.");
+    }
+
+    @Override
+    public boolean canUseInBattle() {
+        return true;
+    }
+
+    @Override
+    public boolean use(Player player, ItemContext context) {
+        if (context == null || !context.isInBattle() || context.getCurrentEnemy() == null) {
+            System.out.println("Scroll of Fireball can only be used during battle.");
+            return false;
+        }
+
+        context.getCurrentEnemy().takeDamage(FIREBALL_DAMAGE);
+        System.out.println("Fireball hits " + context.getCurrentEnemy().getName()
+                + " for " + FIREBALL_DAMAGE + " damage.");
+        return true;
+    }
+}
+
+class ScrollOfStealthItem extends GameItem {
+    public ScrollOfStealthItem() {
+        super("Scroll of Stealth", ItemType.SPECIAL, 0,
+                "Use before battle to sneak past the next non-boss fight.");
+    }
+
+    @Override
+    public boolean canUseOutsideBattle() {
+        return true;
+    }
+
+    @Override
+    public boolean use(Player player, ItemContext context) {
+        if (context == null) {
+            System.out.println("Stealth cannot be applied without room context.");
+            return false;
+        }
+
+        if (context.isInBattle()) {
+            System.out.println("Scroll of Stealth must be used before battle starts.");
+            return false;
+        }
+
+        if (context.getCurrentEnemy() != null && context.getCurrentEnemy().getType() == EnemyType.SNAKE) {
+            System.out.println("Scroll of Stealth cannot bypass a boss encounter.");
+            return false;
+        }
+
+        context.setStealthActive(true);
+        context.setEncounterBypassed(true);
+        System.out.println("Stealth activated. You may bypass the next non-boss encounter.");
+        return true;
+    }
+}
+
+/* =====================================================
+   WEAPONS
+   ===================================================== */
+
+class StickItem extends WeaponItem {
+    public StickItem() {
+        super("Stick", 2, 95, "Stick Attack",
+                "Default weapon. Weak but reliable.");
+    }
+
+    @Override
+    public int getDamageAgainst(Enemy enemy, Player player) {
+        if (enemy != null && enemy.getType() == EnemyType.SLIME) {
+            return 2;
+        }
+
+        return Math.max(1, getPower() + player.getAttack() - enemy.getDefense());
+    }
+}
+
+class SwordItem extends WeaponItem {
+    public SwordItem() {
+        super("Sword", 8, 90, "Sword Slash",
+                "Stronger weapon that can later appear as its own combat action.");
+    }
+}
+
+class GreatSwordItem extends WeaponItem {
+    public GreatSwordItem() {
+        super("Great Sword", 12, 60, "Great Sword Slash",
+                "A great sword heavier than other weapons but also more effective. Accuracy scales with level.");
+    }
+
+    @Override
+    public int getAccuracy() {
+        return 60;
+    }
+
+    public int getAccuracyForLevel(int level) {
+        if (level < 5) {
+            return 60;
+        }
+        if (level <= 10) {
+            return 80;
+        }
+        return 90;
+    }
+
+    public int getAccuracy(Player player) {
+        if (player == null) {
+            return 60;
+        }
+        return getAccuracyForLevel(player.getLevel());
+    }
+}
+
+class TorchItem extends WeaponItem {
+    public TorchItem() {
+        super("Torch", 4, 80, "Torch",
+                "Weapon and utility item. Strong against slime and useful for dark rooms later.");
+    }
+
+    @Override
+    public int getDamageAgainst(Enemy enemy, Player player) {
+        if (enemy != null && enemy.getType() == EnemyType.SLIME) {
+            return Math.max(10, getPower() + player.getAttack() - enemy.getDefense() + 6);
+        }
+
+        return Math.max(1, getPower() + player.getAttack() - enemy.getDefense());
+    }
+
+    @Override
+    public boolean allowsDarkRoomEntry() {
+        return true;
+    }
+}
+
+/* =====================================================
+   PASSIVE GEAR
+   ===================================================== */
+
+class ArmorItem extends PassiveGearItem {
+    public ArmorItem() {
+        super("Armor", "Passive +6 Defense while carried.", 0, 6, false);
+    }
+}
+
+class ShieldItem extends PassiveGearItem {
+    public ShieldItem() {
+        super("Shield", "Passive +3 Defense while carried. Also supports future Parry work.", 0, 3, true);
+    }
+
+    public boolean enablesParry() {
+        return true;
+    }
+
+    public String getBattleActionName() {
+        return "Parry";
+    }
+
+    public int parryDamage(String attackType, boolean hitLands,
+                           int enemyAttack, int movePower, int playerDefense) {
+        if (!hitLands || attackType == null) {
+            return 0;
+        }
+
+        if (attackType.equalsIgnoreCase("heavy")) {
+            return Math.max(1, enemyAttack + movePower - playerDefense);
+        }
+
+        return 0;
+    }
+
+    public String getParryResultMessage(String attackType, boolean hitLands, int reflectedDamage) {
+        if (!hitLands) {
+            return "The enemy attack missed, so parry was not needed.";
+        }
+
+        if (attackType == null) {
+            return "Parry failed.";
+        }
+
+        if (attackType.equalsIgnoreCase("heavy") && reflectedDamage > 0) {
+            return "Parry successful! You redirect the heavy attack and deal "
+                    + reflectedDamage + " damage back to the enemy.";
+        }
+
+        return "Parry failed. Light attacks cannot be parried.";
+    }
+}
+
+class DragonScaleShieldItem extends PassiveGearItem {
+    public DragonScaleShieldItem() {
+        super("Dragon Scale", "A dragon scale from defeated dragon and it can be used as shield.", 0, 8, true);
+    }
+
+    public boolean enablesParry() {
+        return true;
+    }
+
+    public String getBattleActionName() {
+        return "Parry";
+    }
+
+    public int parryDamage(String attackType, boolean hitLands,
+                           int enemyAttack, int movePower, int playerDefense) {
+        if (!hitLands || attackType == null) {
+            return 0;
+        }
+
+        if (attackType.equalsIgnoreCase("heavy")) {
+            return Math.max(1, enemyAttack + movePower - playerDefense);
+        }
+
+        return 0;
+    }
+
+    public String getParryResultMessage(String attackType, boolean hitLands, int reflectedDamage) {
+        if (!hitLands) {
+            return "The enemy attack missed, so parry was not needed.";
+        }
+
+        if (attackType == null) {
+            return "Parry failed.";
+        }
+
+        if (attackType.equalsIgnoreCase("heavy") && reflectedDamage > 0) {
+            return "Parry successful! You redirect the heavy attack and deal "
+                    + reflectedDamage + " damage back to the enemy.";
+        }
+
+        return "Parry failed. Light attacks cannot be parried.";
+    }
+}
+
+/* =====================================================
+   KEYS / SPECIAL ITEMS
+   ===================================================== */
+
+class KeyItem extends GameItem {
+    private final String keyId;
+
+    public KeyItem(String keyId, String displayName) {
+        super(displayName, ItemType.SPECIAL, 0,
+                "Used automatically when checking locked doors. Key ID: " + keyId);
+        this.keyId = keyId;
+    }
+
+    public String getKeyId() {
+        return keyId;
+    }
+}
