@@ -1,8 +1,7 @@
-
 import java.util.*;
 
 /**
- * Dark Holds - Floor 1 Prototype (External Banks Build)
+ * Dark Holds - Floor 1, 2 & 3 Prototype (External Banks Build)
  * ----------------------------------------------
  * Uses the exact uploaded item bank unchanged and a separate bestiary bank so the
  * main prototype can stay focused on game flow, room structure, combat flow,
@@ -45,7 +44,7 @@ class Game {
     private void introStory() {
         System.out.println("========================================");
         System.out.println("           DARK HOLDS");
-        System.out.println("   FLOOR 1 PROTOTYPE MODULAR BUILD");
+        System.out.println("   FLOOR 1, 2 & 3 PROTOTYPE MODULAR BUILD");
         System.out.println("========================================");
         System.out.println("You were once an ordinary villager with no great battle experience.");
         System.out.println("While traveling near ancient ruins, you stepped on a hidden teleportation trap.");
@@ -65,6 +64,42 @@ class Game {
 
     private void setupGame() {
         rooms = WorldBuilder.createFloorOne(random);
+        
+        // Generate Floor 2 and Floor 3
+        List<Room> f2Rooms = WorldBuilder.createFloorTwo(random);
+        List<Room> f3Rooms = WorldBuilder.createFloorThree(random);
+        
+        // Create the connecting stairs room (F1 to F2)
+        Room stairs1 = new Room("f1_stairs", "Stairs to Floor 2",
+                "A spiral stone staircase leading down into the darkness of the second floor. The heavy stone door shuts and locks firmly behind you.",
+                false, false);
+        
+        // Link F1 boss to the stairs, then stairs to the first F2 room (One-way)
+        Room f1Boss = rooms.get("f1snakeBoss");
+        f1Boss.setClearedDescription("The serpent lair is still and quiet now. A heavy stone door has opened, revealing a staircase.");
+        f1Boss.addNeighbor(stairs1.getId());
+        stairs1.addNeighbor(f2Rooms.get(0).getId());
+
+        // Create the connecting stairs room (F2 to F3)
+        Room stairs2 = new Room("f2_stairs", "Stairs to Floor 3",
+                "A deep, echoing stairwell descends further into the dark holds. The path crumbles behind you, sealing the way back.",
+                false, false);
+        
+        // Link F2 boss to the stairs, then stairs to the first F3 room (One-way)
+        Room f2Boss = f2Rooms.get(f2Rooms.size() - 1); // f2_golem_rune is the last room
+        f2Boss.addNeighbor(stairs2.getId());
+        stairs2.addNeighbor(f3Rooms.get(0).getId());
+
+        // Add the new rooms to the map
+        rooms.put(stairs1.getId(), stairs1);
+        for (Room r : f2Rooms) {
+            rooms.put(r.getId(), r);
+        }
+        rooms.put(stairs2.getId(), stairs2);
+        for (Room r : f3Rooms) {
+            rooms.put(r.getId(), r);
+        }
+
         distributeGuaranteedLoot();
         player.setCurrentRoom("f1safe");
         player.setPreviousRoom("f1safe");
@@ -77,7 +112,7 @@ class Game {
         List<Room> potionEligibleRooms = new ArrayList<>();
 
         for (Room room : rooms.values()) {
-            if (room.isKeyEligible()) {
+            if (room.isKeyEligible() && room.getId().startsWith("f1")) {
                 keyEligibleRooms.add(room);
             }
 
@@ -127,7 +162,39 @@ class Game {
             System.out.println(current.getName());
             System.out.println("========================================");
             System.out.println(current.getDisplayDescription());
+            
+            if (current.hasKeyReward() && !current.isRewardsCollected()) {
+                System.out.println();
+                System.out.println(">> You spot an Iron Key resting somewhere in this room! <<");
+            }
+            
             showPlayerStatus();
+
+            if (current.isPuzzleRoom() && !current.isPuzzleSolved() && !current.hasEnemy()) {
+                if (current.getId().equals("f1p_weighingScales")) {
+                    handleScalesPuzzle(current);
+                } else if (current.getId().equals("f1p_brokenFork")) {
+                    handleBrokenForkPuzzle(current);
+                } else if (current.getId().equals("f1p_shrine")) {
+                    handleShrinePuzzle(current);
+                } else if (current.getId().equals("f2p_totem")) {
+                    handleTotemPuzzle(current);
+                } else if (current.getId().equals("f2p_weepingstatue")) {
+                    handleWeepingStatue(current);
+                } else if (current.getId().equals("f2p_campsite")) {
+                    handleCampsite(current);
+                } else if (current.getId().equals("f2p_wishwell")) {
+                    handleWishWell(current);
+                } else if (current.getId().equals("f3p_silentlibrary")) {
+                    handleSilentLibrary(current);
+                } else if (current.getId().equals("f3p_colorpillars")) {
+                    handleColorPillars(current);
+                }
+
+                if (!player.isAlive()) {
+                    continue;
+                }
+            }
 
             if (current.hasEnemy() && !current.getEnemy().isDefeated()) {
                 boolean beginsBattle = promptBeforeBattle(current);
@@ -151,12 +218,225 @@ class Game {
 
             revealRoomRewards(current);
 
-            if (current.getId().equals("f1snakeBoss")) {
+            // Victory is triggered at the end of floor 3
+            if (current.getId().equals("f3_end")) {
                 victory();
                 return;
             }
 
             handleRoomChoices(current);
+        }
+    }
+
+    private void handleScalesPuzzle(Room room) {
+        System.out.println();
+        System.out.println("The scale waits for an offering to balance the path.");
+        System.out.println("1. Offer 20 gold");
+        System.out.println("2. Offer an item from your inventory");
+        System.out.println("3. Ignore it and try to walk past");
+        System.out.print("Choose: ");
+
+        String answer = DarkHoldsFloor1PrototypeMasterBuild.input.nextLine().trim();
+
+        if (answer.equals("1")) {
+            if (player.getGold() >= 20) {
+                player.addGold(-20);
+                System.out.println("You place 20 gold on the scale. It balances perfectly! The path is safe.");
+                room.setPuzzleSolved(true);
+            } else {
+                System.out.println("You don't have enough gold! The scales tip violently, triggering a trap door!");
+                room.setEnemy(DarkHoldsBestiary.goblin());
+                room.setPuzzleSolved(true); 
+            }
+        } else if (answer.equals("2")) {
+            if (player.getInventory().isEmpty()) {
+                System.out.println("You have no items to offer! The scales tip violently, triggering a trap door!");
+                room.setEnemy(DarkHoldsBestiary.goblin());
+                room.setPuzzleSolved(true); 
+            } else {
+                System.out.println("Choose an item to offer:");
+                for (int i = 0; i < player.getInventory().size(); i++) {
+                    System.out.println((i + 1) + ". " + player.getInventory().get(i).getName());
+                }
+                System.out.print("Choose item number: ");
+
+                try {
+                    int index = Integer.parseInt(DarkHoldsFloor1PrototypeMasterBuild.input.nextLine().trim()) - 1;
+                    if (index >= 0 && index < player.getInventory().size()) {
+                        System.out.println("You place the " + player.getInventory().get(index).getName() + " on the scale.");
+                        player.removeItem(index);
+                        System.out.println("It balances perfectly! The path is safe.");
+                        room.setPuzzleSolved(true); 
+                    } else {
+                        System.out.println("Invalid choice! You hesitate too long and the mechanism snaps, triggering an ambush!");
+                        room.setEnemy(DarkHoldsBestiary.goblin());
+                        room.setPuzzleSolved(true);
+                    }
+                } catch (NumberFormatException e) {
+                    System.out.println("Invalid choice! You hesitate too long and the mechanism snaps, triggering an ambush!");
+                    room.setEnemy(DarkHoldsBestiary.goblin());
+                    room.setPuzzleSolved(true);
+                }
+            }
+        } else {
+            System.out.println("You try to sneak past, but the floor plates shift beneath your feet. An ambush is sprung!");
+            room.setEnemy(DarkHoldsBestiary.goblin());
+            room.setPuzzleSolved(true);
+        }
+    }
+
+    private void handleBrokenForkPuzzle(Room room) {
+        System.out.println();
+        System.out.println("The cracked masonry features three stone bricks that can be pushed in.");
+        System.out.println("1. Push the left brick");
+        System.out.println("2. Push the center brick");
+        System.out.println("3. Push the right brick");
+        System.out.print("Choose: ");
+        String answer = DarkHoldsFloor1PrototypeMasterBuild.input.nextLine().trim();
+
+        if (answer.equals("2")) {
+            System.out.println("A heavy stone slides away, solving the puzzle!");
+            room.setPuzzleSolved(true);
+        } else {
+            System.out.println("A hidden dart shoots from the wall!");
+            player.takeDamage(5);
+            System.out.println("You take 5 damage and step back.");
+        }
+    }
+
+    private void handleShrinePuzzle(Room room) {
+        System.out.println();
+        System.out.println("The riddle on the altar reads: 'I speak without a mouth and hear without ears. I have nobody, but I come alive with wind. What am I?'");
+        System.out.println("1. A ghost");
+        System.out.println("2. An echo");
+        System.out.println("3. A snake");
+        System.out.print("Choose: ");
+        String answer = DarkHoldsFloor1PrototypeMasterBuild.input.nextLine().trim();
+
+        if (answer.equals("2")) {
+            System.out.println("The shrine hums in approval. The puzzle is solved!");
+            room.setPuzzleSolved(true);
+        } else {
+            System.out.println("A hidden mechanism strikes you!");
+            player.takeDamage(5);
+            System.out.println("You take 5 damage and the riddle resets.");
+        }
+    }
+    
+    private void handleTotemPuzzle(Room room) {
+        System.out.println();
+        System.out.println("1. Feed the Wolf");
+        System.out.println("2. Feed the Bat");
+        System.out.println("3. Feed the Snake");
+        System.out.print("Choose: ");
+        String answer = DarkHoldsFloor1PrototypeMasterBuild.input.nextLine().trim();
+
+        if (answer.equals("2")) {
+            System.out.println("The portcullis grinds open, solving the puzzle.");
+            room.setPuzzleSolved(true);
+        } else {
+            System.out.println("A hidden spring trap shoots a rusty spear!");
+            player.takeDamage(8);
+            System.out.println("You take 8 damage.");
+        }
+    }
+    
+    private void handleWeepingStatue(Room room) {
+        System.out.println();
+        System.out.println("1. Drink the water");
+        System.out.println("2. Ignore it");
+        System.out.print("Choose: ");
+        String answer = DarkHoldsFloor1PrototypeMasterBuild.input.nextLine().trim();
+
+        if (answer.equals("1")) {
+            if (random.nextBoolean()) {
+                player.increaseBaseAttack(2);
+                System.out.println("The oily water burns your throat, but you feel a surge of power! Attack permanently increased by 2.");
+            } else {
+                player.takeDamage(5);
+                System.out.println("The oily water is foul! You take 5 damage.");
+            }
+            room.setPuzzleSolved(true);
+        } else {
+            System.out.println("You wisely decide to ignore the strange water.");
+            room.setPuzzleSolved(true);
+        }
+    }
+
+    private void handleCampsite(Room room) {
+        System.out.println();
+        System.out.println("1. Rest by the cold firepit");
+        System.out.println("2. Keep moving");
+        System.out.print("Choose: ");
+        String answer = DarkHoldsFloor1PrototypeMasterBuild.input.nextLine().trim();
+
+        if (answer.equals("1")) {
+            System.out.println("You lay out the dusty bedroll and rest for a while, regaining 20 HP.");
+            player.heal(20);
+        } else {
+            System.out.println("You decide not to rest.");
+        }
+        room.setPuzzleSolved(true);
+    }
+
+    private void handleWishWell(Room room) {
+        System.out.println();
+        System.out.println("1. Toss in 5 gold");
+        System.out.println("2. Leave it alone");
+        System.out.print("Choose: ");
+        String answer = DarkHoldsFloor1PrototypeMasterBuild.input.nextLine().trim();
+
+        if (answer.equals("1")) {
+            if (player.getGold() >= 5) {
+                player.addGold(-5);
+                System.out.println("You toss 5 gold into the dark well. It vanishes into the depths...");
+                if (random.nextBoolean()) {
+                    System.out.println("A small vial inexplicably floats to the surface! You found a Small Potion.");
+                    player.addItem(DarkHoldsItems.smallPotion());
+                } else {
+                    System.out.println("You wait, but nothing happens. The gold is gone.");
+                }
+                room.setPuzzleSolved(true);
+            } else {
+                System.out.println("You don't have enough gold!");
+            }
+        } else {
+            System.out.println("You step away from the edge of the well.");
+            room.setPuzzleSolved(true);
+        }
+    }
+
+    private void handleSilentLibrary(Room room) {
+        System.out.println();
+        System.out.println("1. Search the rotting shelves");
+        System.out.println("2. Walk past them");
+        System.out.print("Choose: ");
+        String answer = DarkHoldsFloor1PrototypeMasterBuild.input.nextLine().trim();
+
+        if (answer.equals("1")) {
+            System.out.println("You brush away the thick dust and find an intact magical scroll!");
+            player.addItem(DarkHoldsItems.scrollOfFireball());
+        } else {
+            System.out.println("You leave the ancient books undisturbed in their silence.");
+        }
+        room.setPuzzleSolved(true);
+    }
+
+    private void handleColorPillars(Room room) {
+        System.out.println();
+        System.out.println("1. Touch the Red pillar");
+        System.out.println("2. Touch the Blue pillar");
+        System.out.println("3. Touch the Yellow pillar");
+        System.out.print("Choose: ");
+        String answer = DarkHoldsFloor1PrototypeMasterBuild.input.nextLine().trim();
+
+        if (answer.equals("1")) {
+            System.out.println("The red pillar sinks into the floor, and the door clicks open. The path is clear!");
+            room.setPuzzleSolved(true);
+        } else {
+            System.out.println("Incorrect! A hidden dart shoots out from the wall!");
+            player.takeDamage(5);
+            System.out.println("You take 5 damage.");
         }
     }
 
@@ -177,6 +457,10 @@ class Game {
         }
 
         if (room.hasEnemy() && !room.getEnemy().isDefeated()) {
+            return;
+        }
+
+        if (room.isPuzzleRoom() && !room.isPuzzleSolved()) {
             return;
         }
 
@@ -216,6 +500,7 @@ class Game {
             System.out.println("A " + room.getEnemy().getName() + " is here.");
             System.out.println("1. Fight");
             System.out.println("2. Back away");
+            
             System.out.print("Choose: ");
             String answer = DarkHoldsFloor1PrototypeMasterBuild.input.nextLine().trim();
 
@@ -289,6 +574,27 @@ class Game {
         List<String> visible = new ArrayList<>();
 
         for (String neighborId : current.getNeighborIds()) {
+            if (current.getId().equals("f1snakeBoss")
+                    && (neighborId.equals("f1_snakeHoard") || neighborId.equals("f1_stairs") || neighborId.startsWith("f2"))
+                    && current.hasEnemy()
+                    && !current.getEnemy().isDefeated()) {
+                continue;
+            }
+
+            if (current.getId().equals("f2_golem_rune")
+                    && (neighborId.equals("f2_stairs") || neighborId.startsWith("f3"))
+                    && current.hasEnemy()
+                    && !current.getEnemy().isDefeated()) {
+                continue;
+            }
+            
+            if (current.getId().equals("f3_necro_altar")
+                    && (neighborId.equals("f3_end"))
+                    && current.hasEnemy()
+                    && !current.getEnemy().isDefeated()) {
+                continue;
+            }
+
             visible.add(neighborId);
         }
 
@@ -360,10 +666,10 @@ class Game {
     private void victory() {
         System.out.println();
         System.out.println("========================================");
-        System.out.println("FLOOR 1 CLEARED");
+        System.out.println("FLOOR 3 CLEARED");
         System.out.println("========================================");
-        System.out.println("The giant snake lies still behind you.");
-        System.out.println("For this modular room-style build, your descent ends here.");
+        System.out.println("You have vanquished the Necromancer and cleared the third floor.");
+        System.out.println("For this prototype build, your descent ends here.");
         running = false;
     }
 
@@ -397,6 +703,10 @@ class WorldBuilder {
         puzzlePool.add(new Room("f1p_shrine", "Serpent Shrine",
                 "A shrine of coiled stone and old offerings. A riddle is carved into the altar.",
                 true, true));
+        Room weighingScales = new Room("f1p_weighingScales", "Room of Scales",
+                "A massive bronze scale dominates the center of the room. One side is weighed down by a stone heart; the other side sits empty, waiting for an offering.",
+                true, true);
+        puzzlePool.add(weighingScales);
 
         List<Room> fightPool = new ArrayList<>();
         Room batRoom = new Room("f1f_batRoost", "Bat Roost",
@@ -419,6 +729,30 @@ class WorldBuilder {
         slimeRoom.setEnemy(DarkHoldsBestiary.slime());
         slimeRoom.setClearedDescription("The damp tunnel is calmer now, though the stones still glisten with foul residue.");
         fightPool.add(slimeRoom);
+        
+        Room chimneyShaft = new Room("f1f_chimneyShaft", "Crumbling Chimney",
+                "A vertical shaft lets in a sliver of moonlight. A swarm of bats uses this as a highway to the surface, and you've just stepped directly into their flight path.",
+                true, true);
+        chimneyShaft.setEnemy(DarkHoldsBestiary.bat());
+        fightPool.add(chimneyShaft);
+
+        Room batRoots = new Room("f1f_bat_roots", "Hanging Roots", 
+                "Thick, dead tree roots punch through the ceiling here. Clinging to the roots like grim fruit are dozens of sleeping bats. One opens its red eyes.", 
+                true, true);
+        batRoots.setEnemy(DarkHoldsBestiary.bat());
+        fightPool.add(batRoots);
+
+        Room wolfDen = new Room("f1f_wolf_den", "Beast's Den", 
+                "The floor is covered in matted fur and the smell of wet dog is overpowering. A massive wolf blocks the exit, growling low in its throat.", 
+                true, true);
+        wolfDen.setEnemy(DarkHoldsBestiary.wolf());
+        fightPool.add(wolfDen);
+
+        Room wolfTunnel = new Room("f1f_wolf_tunnel", "Howling Tunnel", 
+                "The wind drafts through this tunnel perfectly, creating a low, mournful howl. A real howl answers back as a wolf lunges from the shadows.", 
+                true, true);
+        wolfTunnel.setEnemy(DarkHoldsBestiary.wolf());
+        fightPool.add(wolfTunnel);
 
         List<Room> generalPool = new ArrayList<>();
         generalPool.add(new Room("f1_cache", "Empty Cache",
@@ -427,6 +761,10 @@ class WorldBuilder {
         generalPool.add(new Room("f1_snakeHoard", "Snake Hoard",
                 "Gold glints among bones and torn packs.",
                 true, true));
+        Room fallenAdventurer = new Room("f1_fallenAdventurer", "Fallen Adventurer",
+                "A skeleton slumps against the wall, clutching a broken weapon. Their armor is torn to ribbons by something incredibly large.",
+                true, true);
+        generalPool.add(fallenAdventurer);
 
         Room r1 = new Room("f1safe", "Safe Room",
                 "You wake in a cold stone chamber with only a rough stick beside you. "
@@ -471,9 +809,139 @@ class WorldBuilder {
         return rooms;
     }
 
-    private static void connect(Room a, Room b) {
+    public static List<Room> createFloorTwo(Random random) {
+        List<Room> f2Rooms = new ArrayList<>();
+
+        Room totem = new Room("f2p_totem", "Totem of Gruum",
+                "A crude wooden totem pole stands before a locked portcullis. It has three animal faces carved into it: a Wolf, a Bat, and a Snake. A blood-stained prompt reads: 'Feed the beast that sees without eyes to open the path.'",
+                false, false);
+
+        Room altar = new Room("f2_shamansAltar", "The Shaman's Altar",
+                "A makeshift altar of stacked stones is covered in melted wax and glowing green embers. The Orc shaman who built it is long gone, but they left behind a pristine glass flask filled with a glowing red liquid.",
+                false, false);
+        altar.addRewardItem(DarkHoldsItems.bigPotion());
+
+        Room statue = new Room("f2p_weepingstatue", "Weeping Statue",
+                "A towering marble statue of a hooded figure stands in the corner. Dark, oily water streaks down its face like tears, pooling at its stone feet.",
+                false, false);
+
+        Room armory = new Room("f2_desecratedArmory", "Desecrated Armory",
+                "Shattered shields and bent swords litter the floor. It looks torn through here and there is nothing of real value. However, searching through the wreckage reveals a small, untouched lockbox.",
+                false, false);
+        if (random.nextBoolean()) {
+            armory.addRewardItem(DarkHoldsItems.smallPotion());
+        } else {
+            armory.addGold(randomGold(7, 20));
+        }
+
+        Room slimePool = new Room("f2f_slime_pool", "Acidic Pool", 
+                "A bubbling, green puddle takes up most of the floor. Suddenly, the puddle rises upward, forming into a massive, translucent blob.", 
+                false, false);
+        slimePool.setEnemy(DarkHoldsBestiary.slime());
+
+        Room slimeCeiling = new Room("f2f_slime_ceiling", "The Dripping Ceiling", 
+                "You hear a wet plop behind you. You look up to see the ceiling is coated in a vibrating slime that suddenly drops onto the floor to engage you.", 
+                false, false);
+        slimeCeiling.setEnemy(DarkHoldsBestiary.slime());
+
+        Room skelCrypt = new Room("f2f_skel_crypt", "Forgotten Crypt", 
+                "Stone sarcophagi line the walls. The lid of one slides off with a horrible grinding noise, and a skeleton steps out, raising a rusted sword.", 
+                false, false);
+        skelCrypt.setEnemy(DarkHoldsBestiary.skeleton());
+
+        Room skelGrave = new Room("f2f_skel_grave", "The Mass Grave", 
+                "The floor here isn't stone—it's tightly packed earth, churning and shifting. A skeletal hand bursts from the dirt, followed by the rest of the undead warrior.", 
+                false, false);
+        skelGrave.setEnemy(DarkHoldsBestiary.skeleton());
+
+        Room campsite = new Room("f2p_campsite", "Abandoned Campsite", 
+                "A dusty bedroll and a cold firepit sit in the corner. It looks like whoever was here left in a hurry, but it is quiet and safe now.", 
+                false, false);
+
+        Room wishWell = new Room("f2p_wishwell", "The Wishing Well", 
+                "A deep stone well sits in the center of the room. You can hear the faint sound of running water far below, and see the glimmer of coins at the bottom.", 
+                false, false);
+
+        f2Rooms.add(totem);
+        f2Rooms.add(altar);
+        f2Rooms.add(statue);
+        f2Rooms.add(armory);
+        f2Rooms.add(slimePool);
+        f2Rooms.add(slimeCeiling);
+        f2Rooms.add(skelCrypt);
+        f2Rooms.add(skelGrave);
+        f2Rooms.add(campsite);
+        f2Rooms.add(wishWell);
+
+        // Shuffle the core F2 rooms
+        Collections.shuffle(f2Rooms, random);
+
+        // Floor 2 Boss
+        Room golemBoss = new Room("f2_golem_rune", "Runestone Chamber", 
+                "A Golem made entirely of carved runestones stands guard in front of a locked iron door. As you step forward, the runes glow red.", 
+                false, false);
+        golemBoss.setEnemy(DarkHoldsBestiary.bat()); // Bat used as placeholder for missing Golem
+        golemBoss.setClearedDescription("The Golem crumbles into a pile of inert stones. The heavy iron door has opened, revealing stairs downwards.");
+        f2Rooms.add(golemBoss);
+
+        // Connect them linearly
+        for (int i = 0; i < f2Rooms.size() - 1; i++) {
+            connect(f2Rooms.get(i), f2Rooms.get(i + 1));
+        }
+
+        return f2Rooms;
+    }
+
+    public static List<Room> createFloorThree(Random random) {
+        List<Room> f3Rooms = new ArrayList<>();
+
+        Room silentLibrary = new Room("f3p_silentlibrary", "Silent Library", 
+                "Rows of rotting bookshelves line this chamber. The dust is so thick it absorbs all sound, making the room eerily silent.", 
+                false, false);
+        
+        Room colorPillars = new Room("f3p_colorpillars", "Color Pillars", 
+                "Three pillars stand before a locked door. One is painted red, one blue, and one yellow. A plaque reads: 'The color of the lifeblood opens the way.'", 
+                false, false);
+
+        Room bonePit = new Room("f3f_bonePit", "The Bone Pit",
+                "You step onto a floor entirely covered in massive, gnawed bones. A hulking Ogre slowly turns towards you.",
+                false, false);
+        bonePit.setEnemy(DarkHoldsBestiary.bat()); 
+
+        f3Rooms.add(silentLibrary);
+        f3Rooms.add(colorPillars);
+        f3Rooms.add(bonePit);
+        Collections.shuffle(f3Rooms, random);
+
+        // Floor 3 Boss
+        Room necroBoss = new Room("f3_necro_altar", "Profane Altar", 
+                "Black candles burn with purple flames. A Necromancer in tattered robes is chanting in a language that hurts your ears.", 
+                false, false);
+        necroBoss.setEnemy(DarkHoldsBestiary.necromancer());
+        necroBoss.setClearedDescription("The purple flames extinguish instantly as the Necromancer falls. The dark magic holding this room has vanished.");
+        f3Rooms.add(necroBoss);
+
+        // End of prototype game state
+        Room f3End = new Room("f3_end", "The Final Descent", 
+                "You step past the profane altar, having conquered the Dark Holds prototype...", 
+                false, false);
+        f3Rooms.add(f3End);
+
+        for (int i = 0; i < f3Rooms.size() - 1; i++) {
+            connect(f3Rooms.get(i), f3Rooms.get(i + 1));
+        }
+
+        return f3Rooms;
+    }
+
+    public static void connect(Room a, Room b) {
         a.addNeighbor(b.getId());
         b.addNeighbor(a.getId());
+    }
+    
+    private static int randomGold(int min, int max) {
+        Random random = new Random();
+        return min + random.nextInt(max - min + 1);
     }
 }
 
@@ -496,6 +964,7 @@ class BattleManager {
         System.out.println("A battle begins against " + enemy.getName() + "!");
 
         while (player.isAlive() && enemy.isAlive()) {
+            
             System.out.println();
             System.out.println(player.getName() + " HP: " + player.getHp() + "/" + player.getMaxHp());
             System.out.println(enemy.getName() + " HP: " + enemy.getHp() + "/" + enemy.getMaxHp());
@@ -564,7 +1033,7 @@ class BattleManager {
                     }
                 } else if (action == PlayerAction.RUN) {
                     boolean escaped = tryRun(player);
-                    actionResolved = true;
+                    actionResolved = true; // Consumes turn whether successful or not
 
                     if (escaped) {
                         return BattleResult.ESCAPED;
@@ -996,6 +1465,10 @@ class Player {
         }
     }
 
+    public void increaseBaseAttack(int amount) {
+        this.baseAttack += amount;
+    }
+
     public boolean isAlive() {
         return hp > 0;
     }
@@ -1126,6 +1599,8 @@ class Room {
     private boolean rewardsCollected;
     private boolean preLock;
     private boolean keyEligible;
+    private final boolean puzzleRoom;
+    private boolean puzzleSolved;
 
     public Room(String id, String name, String description, boolean preLock, boolean keyEligible) {
         this.id = id;
@@ -1139,6 +1614,9 @@ class Room {
         this.goldReward = 0;
         this.hasKeyReward = false;
         this.rewardsCollected = false;
+        
+        this.puzzleRoom = id.contains("p_");
+        this.puzzleSolved = false;
     }
 
     public void addNeighbor(String neighborId) {
@@ -1181,6 +1659,10 @@ class Room {
 
     public boolean hasBeenCleared() {
         if (hasEnemy() && enemy.isDefeated()) {
+            return true;
+        }
+        
+        if (isPuzzleRoom() && puzzleSolved) {
             return true;
         }
 
@@ -1238,6 +1720,18 @@ class Room {
     public void setKeyEligible(boolean keyEligible) {
         this.keyEligible = keyEligible;
     }
+
+    public boolean isPuzzleRoom() {
+        return puzzleRoom;
+    }
+
+    public boolean isPuzzleSolved() {
+        return puzzleSolved;
+    }
+
+    public void setPuzzleSolved(boolean puzzleSolved) {
+        this.puzzleSolved = puzzleSolved;
+    }
 }
 
 /* =====================================================
@@ -1281,26 +1775,6 @@ enum ItemType {
 
 /* =====================================================
    SECTION 6 - ITEM BANK (MERGED FROM rpgitem.java)
-   ===================================================== */
-
-/**
- * RPGitemsONLY_fixed.java
- * --------------------------------
- * Item-only support file for the Dark Holds prototype.
- *
- * This file is meant to be attached to the main prototype so the main game can
- * pull item objects directly from here.
- *
- * Assumes the main prototype already defines:
- * - Item
- * - ItemType
- * - Player
- * - Enemy
- * - EnemyType
- */
-
-/* =====================================================
-   ITEM FACTORY / HELPER
    ===================================================== */
 
 final class DarkHoldsItems {
@@ -1912,26 +2386,6 @@ class BookOfSpellsItem extends GameItem {
 
 /* =====================================================
    SECTION 7 - BESTIARY BANK (MERGED FROM rpgbestiary.java)
-   ===================================================== */
-
-/**
- * rpgbestiary
- * --------------------------------
- * Enemy-only support file for the Dark Holds prototype.
- *
- * This file is meant to be attached to the main prototype so the main game can
- * pull enemy objects directly from here.
- *
- * Assumes the main prototype already defines:
- * - Player
- * - Room
- * - Battle flow logic
- * - Item
- * - ItemType
- */
-
-/* =====================================================
-   BESTIARY FACTORY / HELPER
    ===================================================== */
 
 final class DarkHoldsBestiary {
