@@ -1,0 +1,24 @@
+# Dark Holds: A Terminal RPG
+
+**Dark Holds** is a text-based, terminal-driven dungeon crawler forged entirely in Java. What began as a monolithic, single-file prototype has been meticulously reconstructed into a modular, 8-pillar Object-Oriented architecture. 
+
+You awaken in a buried labyrinth with nothing but a rough stick. Somewhere below, a giant serpent coils around stolen treasure, and a dark magic stirs. You must explore, survive, and descend.
+
+## 💀 Features of the Crypt
+* **Three Hand-Crafted Floors:** Navigate branching paths, locked gates, and forgotten shrines.
+* **Deep Turn-Based Combat:** Engage in tactical terminal combat featuring weapon accuracy, dodging, parrying, status effects (like blindness from pocket sand and constriction), and item usage.
+* **Intricate Puzzles & Events:** Encounter weighing scales, wishing wells, weeping statues, and crimson altars. Your choices can grant permanent stat boosts, trigger hidden ambushes, or lead to sudden death.
+* **Inventory & Loot System:** Scavenge for weapons, protective gear, healing potions, and arcane scrolls (Fireball, Life Steal, Stealth). 
+* **Modular Architecture:** A clean, highly separated codebase designed for infinite horizontal scaling. Adding a new monster or item requires zero changes to the core game loop.
+
+## 🏛️ The Eight-Pillar Architecture (Code Structure)
+The codebase has been ruthlessly divided to adhere to the Separation of Concerns, ensuring this digital phylactery remains immortal and easy to maintain:
+
+1. **`DarkHolds.java` (The Core Grimoire):** Houses the main method and the core game loop. It handles room traversal, menu prompts, and delegates logic to the managers.
+2. **`WorldBuilder.java` (The Architect's Blueprint):** Contains the generation logic for every floor, room connection, and guaranteed loot placement.
+3. **`BattleManager.java` (The Arena of Blood):** Handles the entirety of combat mathematics, turn resolution, parry checking, and escape attempts.
+4. **`PuzzleManager.java` (The Master of Traps):** Isolates every room-specific event, riddle, and trap away from the main game loop.
+5. **`Items.java` (The Item Vault):** The factory and base definitions for all weapons, gear, potions, and scrolls.
+6. **`Bestiary.java` (The Monster Vault):** The factory containing the stats and movesets for every creature in the game.
+7. **`Player.java` (The Flesh):** The state container for the hero's health, stats, level progression, and inventory.
+8. **`Room.java` (The Stone):** The state container defining what a room is, its neighbors, its current enemy, and its hidden rewards.
