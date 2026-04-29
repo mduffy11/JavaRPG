@@ -1,9 +1,9 @@
 import java.util.*;
 
 /**
- * Dark Holds - The Grand Monolith
+ * Dark Holds - The Grand Monolith (TEN Pillars + New Bosses)
  * ----------------------------------------------
- * The Eight Pillars of the Crypt, bound into a single massive scroll.
+ * The Ten Pillars of the Crypt, bound into a single massive scroll.
  */
 public class DarkHolds {
 
@@ -27,12 +27,14 @@ class Game {
     private final Random random;
     private final BattleManager battleManager;
     private final PuzzleManager puzzleManager;
+    private final MerchantManager merchantManager;
     private boolean running;
 
     public Game() {
         this.random = new Random();
         this.battleManager = new BattleManager();
         this.puzzleManager = new PuzzleManager();
+        this.merchantManager = new MerchantManager();
     }
 
     public void start() {
@@ -44,7 +46,7 @@ class Game {
     private void introStory() {
         System.out.println("========================================");
         System.out.println("           DARK HOLDS");
-        System.out.println("     THE GRAND MONOLITH BUILD");
+        System.out.println("   THE GRAND MONOLITH BUILD (10 PILLARS)");
         System.out.println("========================================");
         System.out.println("You were once an ordinary villager with no great battle experience.");
         System.out.println("While traveling near ancient ruins, you stepped on a hidden teleportation trap.");
@@ -115,7 +117,6 @@ class Game {
         Room hoard = rooms.get("f1snakeBoss");
         if (hoard != null) {
             hoard.addRewardItem(Items.ancientRelic());
-            hoard.addGold(randomBetween(25, 50));
         }
     }
 
@@ -136,7 +137,17 @@ class Game {
             System.out.println("========================================");
             System.out.println(current.getName());
             System.out.println("========================================");
-            System.out.println(current.getDisplayDescription());
+            
+            // DYNAMIC DRAGON ANTECHAMBER TEXT
+            if (current.getId().equals("f3_dragon_antechamber")) {
+                if (player.hasItem("Ancient Relic")) {
+                    System.out.println("A heavy stone door sits in the shadows. It is sealed tight, but in its center is an odd, jagged indentation that perfectly matches the Ancient Relic in your pack.");
+                } else {
+                    System.out.println("A heavy stone door sits in the shadows. It is sealed tight by ancient magic. There is a strange indentation in the center, but you have nothing that fits it.");
+                }
+            } else {
+                System.out.println(current.getDisplayDescription());
+            }
             
             if (current.hasKeyReward() && !current.isRewardsCollected()) {
                 System.out.println("\n>> You spot an Iron Key resting somewhere in this room! <<");
@@ -214,6 +225,7 @@ class Game {
 
         if (room.hasKeyReward()) {
             System.out.println("\nYou discover an Iron Key hidden here.");
+            ImageGallery.reveal("Iron Key");
             player.addKey(Items.floorOneIronKey());
             foundSomething = true;
         }
@@ -222,6 +234,7 @@ class Game {
             System.out.println();
             for (Item item : room.getRewardItems()) {
                 System.out.println("You found: " + item.getName());
+                ImageGallery.reveal(item.getName());
                 player.addItem(item);
             }
             foundSomething = true;
@@ -232,7 +245,9 @@ class Game {
 
     private boolean promptBeforeBattle(Room room) {
         while (true) {
-            System.out.println("\nA " + room.getEnemy().getName() + " is here.");
+            System.out.println();
+            ImageGallery.reveal(room.getEnemy().getName()); 
+            System.out.println("A " + room.getEnemy().getName() + " is here.");
             System.out.println("1. Fight\n2. Back away\nChoose: ");
             String answer = DarkHolds.input.nextLine().trim();
 
@@ -253,17 +268,33 @@ class Game {
                 Room nextRoom = rooms.get(neighborIds.get(i));
                 String text = "Go to " + nextRoom.getName();
 
+                // Locked Hall Check
                 if (current.getId().equals("f1safe") && nextRoom.getId().equals("f1lockedHall") && !player.hasKey(FLOOR_ONE_IRON_KEY_ID)) {
                     text = "Try the locked hallway (locked)";
                 }
+                
+                // Dragon Lair Check
+                if (current.getId().equals("f3_dragon_antechamber") && nextRoom.getId().equals("f3_dragon_lair")) {
+                    text = player.hasItem("Ancient Relic") ? "Open the sealed stone door with the Relic" : "Try the sealed stone door (Locked)";
+                }
+
                 System.out.println((i + 1) + ". " + text);
             }
 
-            System.out.println("I. Inventory\nChoose an action: ");
+            System.out.println("I. Inventory");
+            if (current.isMerchantRoom()) {
+                System.out.println("M. Trade with the Goblin Merchant");
+            }
+            System.out.print("Choose an action: ");
             String answer = DarkHolds.input.nextLine().trim();
 
             if (answer.equalsIgnoreCase("I")) {
                 openInventoryMenu();
+                continue;
+            }
+            
+            if (answer.equalsIgnoreCase("M") && current.isMerchantRoom()) {
+                merchantManager.handleMerchant(player, current);
                 continue;
             }
 
@@ -275,9 +306,27 @@ class Game {
                 }
 
                 Room nextRoom = rooms.get(neighborIds.get(choice - 1));
+                
+                // Locked door block
                 if (current.getId().equals("f1safe") && nextRoom.getId().equals("f1lockedHall") && !player.hasKey(FLOOR_ONE_IRON_KEY_ID)) {
                     System.out.println("The heavy hallway gate is locked. You need a key.");
                     continue;
+                }
+                
+                // Dragon door block
+                if (current.getId().equals("f3_dragon_antechamber") && nextRoom.getId().equals("f3_dragon_lair")) {
+                    if (!player.hasItem("Ancient Relic")) {
+                        System.out.println("The heavy stone door refuses to budge. It is magically sealed.");
+                        continue;
+                    } else {
+                        System.out.println("\n*** The heavy stone door grinds open, consuming the Ancient Relic in the process! ***\n");
+                        for (int j = 0; j < player.getInventory().size(); j++) {
+                            if (player.getInventory().get(j).getName().equals("Ancient Relic")) {
+                                player.removeItem(j);
+                                break;
+                            }
+                        }
+                    }
                 }
 
                 if (!nextRoom.getNeighborIds().contains(current.getId())) player.setPreviousRoom(nextRoom.getId());
@@ -297,6 +346,8 @@ class Game {
             if (current.getId().equals("f1snakeBoss") && (neighborId.equals("f1_snakeHoard") || neighborId.equals("f1_stairs") || neighborId.startsWith("f2")) && current.hasEnemy() && !current.getEnemy().isDefeated()) continue;
             if (current.getId().equals("f2_golem_rune") && (neighborId.equals("f2_stairs") || neighborId.startsWith("f3")) && current.hasEnemy() && !current.getEnemy().isDefeated()) continue;
             if (current.getId().equals("f3_necro_altar") && (neighborId.equals("f3_end")) && current.hasEnemy() && !current.getEnemy().isDefeated()) continue;
+            
+            // Dragon Lair is only visible from antechamber (already implicitly true by graph edges)
             visible.add(neighborId);
         }
         return visible;
@@ -581,8 +632,12 @@ class PuzzleManager {
         DarkHolds.input.nextLine().trim(); 
         int choice = random.nextInt(3); 
         if (choice == 0) {
-            System.out.println("A swarm of bats flies out of the chest!");
-            room.setEnemy(Bestiary.bat());
+            System.out.println("The chest suddenly unhinges its jaw! It's a Mimic!");
+            room.setEnemy(Bestiary.mimic());
+            
+            // The Mimic drops a high-tier item upon defeat
+            List<Item> highTier = List.of(Items.bigPotion(), Items.greatSword(), Items.armor(), Items.scrollOfFireball());
+            room.addRewardItem(highTier.get(random.nextInt(highTier.size())));
         } else if (choice == 1) {
             System.out.println("You found 30 gold inside!");
             player.addGold(30);
@@ -855,7 +910,19 @@ class BattleManager {
             return false;
         }
 
-        int damage = torch != null ? torch.getDamageAgainst(enemy, player) : (enemy.getType() == EnemyType.SLIME ? Math.max(10, calculatePlayerDamage(player.getAttack(), 4, enemy.getDefense()) + 6) : calculatePlayerDamage(player.getAttack(), 4, enemy.getDefense()));
+        int damage;
+        // ELEMENTAL AFFINITY OVERRIDE
+        if (enemy.getType() == EnemyType.SKELETON || enemy.getType() == EnemyType.GOLEM) {
+            damage = 2; 
+            System.out.println("The torch flame merely licks the stone and bone, finding no purchase!");
+        } else if (torch != null) {
+            damage = torch.getDamageAgainst(enemy, player);
+        } else if (enemy.getType() == EnemyType.SLIME) {
+            damage = Math.max(10, calculatePlayerDamage(player.getAttack(), 4, enemy.getDefense()) + 6);
+        } else {
+            damage = calculatePlayerDamage(player.getAttack(), 4, enemy.getDefense());
+        }
+
         enemy.takeDamage(damage);
         System.out.println("You lash out with the Torch and deal " + damage + " damage.");
         return false;
@@ -1100,11 +1167,18 @@ class WorldBuilder {
         spoilsRoom.setEnemy(Bestiary.orc());
         f2Pool.add(spoilsRoom);
 
+        // INJECT THE MERCHANT
+        Room merchantRoom = new Room("f2_merchant", "Wandering Merchant's Camp", "A small fire crackles in the corner. A neutral Goblin sits on a heavily burdened mule pack, smoking a pipe.", false, false);
+        merchantRoom.setMerchantRoom(true);
+
         Collections.shuffle(f2Pool, random);
-        f2Rooms.addAll(f2Pool.subList(0, numRooms - 2)); 
+        List<Room> selectedF2 = new ArrayList<>(f2Pool.subList(0, numRooms - 3));
+        selectedF2.add(merchantRoom);
+        Collections.shuffle(selectedF2, random);
+        f2Rooms.addAll(selectedF2);
 
         Room golemBoss = new Room("f2_golem_rune", "Runestone Chamber", "A Golem made entirely of carved runestones stands guard.", false, false);
-        golemBoss.setEnemy(Bestiary.bat()); 
+        golemBoss.setEnemy(Bestiary.golem()); // THE GOLEM REPLACES BATS
         f2Rooms.add(golemBoss);
 
         Room stairs2 = new Room("f2_stairs", "Stairs to Floor 3", "A deep, echoing stairwell descends further into the dark holds.", false, false);
@@ -1153,8 +1227,28 @@ class WorldBuilder {
         cryptKings.addGold(randomGold(15, 25, random));
         f3Pool.add(cryptKings);
 
+        // INJECT THE MERCHANT
+        Room merchantRoom = new Room("f3_merchant", "Wandering Merchant's Camp", "The Goblin Merchant has set up his camp here. He recognizes you and nods, adjusting his wares.", false, false);
+        merchantRoom.setMerchantRoom(true);
+
+        // THE DRAGON ANTECHAMBER (Added to general pool)
+        Room antechamber = new Room("f3_dragon_antechamber", "The Whispering Antechamber", "The air here is unnaturally hot.", false, false);
+        antechamber.addGold(randomGold(10, 30, random));
+        f3Pool.add(antechamber);
+
         Collections.shuffle(f3Pool, random);
-        f3Rooms.addAll(f3Pool.subList(0, numRooms - 2)); 
+        List<Room> selectedF3 = new ArrayList<>(f3Pool.subList(0, numRooms - 3));
+        selectedF3.add(merchantRoom);
+        Collections.shuffle(selectedF3, random);
+        f3Rooms.addAll(selectedF3);
+
+        // THE DRAGON LAIR
+        Room dragonLair = new Room("f3_dragon_lair", "The Dragon's Lair", "A massive cavern scorched black by ancient fire.", false, false);
+        dragonLair.setEnemy(Bestiary.dragon());
+        dragonLair.addRewardItem(Items.dragonScale());
+        
+        // Connect the Lair specifically to the Antechamber
+        connect(antechamber, dragonLair);
 
         Room necroBoss = new Room("f3_necro_altar", "Profane Altar", "A Necromancer in tattered robes is chanting.", false, false);
         necroBoss.setEnemy(Bestiary.necromancer());
@@ -1163,8 +1257,12 @@ class WorldBuilder {
         Room f3End = new Room("f3_end", "The Final Descent", "You step past the profane altar, having conquered the prototype...", false, false);
         f3Rooms.add(f3End);
 
+        // Connect the main linear path
         for (int i = 0; i < f3Rooms.size() - 2; i++) connect(f3Rooms.get(i), f3Rooms.get(i + 1));
         f3Rooms.get(f3Rooms.size() - 2).addNeighbor(f3Rooms.get(f3Rooms.size() - 1).getId());
+
+        // Add the lair at the very end so it exists in the game map without breaking the linear progression
+        f3Rooms.add(dragonLair);
 
         return f3Rooms;
     }
@@ -1284,6 +1382,7 @@ class Room {
     private boolean keyEligible;
     private final boolean puzzleRoom;
     private boolean puzzleSolved;
+    private boolean merchantRoom;
 
     public Room(String id, String name, String description, boolean preLock, boolean keyEligible) {
         this.id = id;
@@ -1299,6 +1398,7 @@ class Room {
         this.rewardsCollected = false;
         this.puzzleRoom = id.contains("p_");
         this.puzzleSolved = false;
+        this.merchantRoom = false;
     }
 
     public void addNeighbor(String neighborId) { if (!neighborIds.contains(neighborId)) neighborIds.add(neighborId); }
@@ -1333,6 +1433,8 @@ class Room {
     public boolean isPuzzleRoom() { return puzzleRoom; }
     public boolean isPuzzleSolved() { return puzzleSolved; }
     public void setPuzzleSolved(boolean puzzleSolved) { this.puzzleSolved = puzzleSolved; }
+    public boolean isMerchantRoom() { return merchantRoom; }
+    public void setMerchantRoom(boolean merchantRoom) { this.merchantRoom = merchantRoom; }
 }
 
 /* =========================================================================================
@@ -1632,75 +1734,94 @@ final class Bestiary {
     private Bestiary() {}
 
     public static Enemy bat() {
-        return new Enemy(EnemyType.BAT, "Bats", 14, 4, 1, 7, randomGold(1, 4),
+        return new Enemy(EnemyType.BAT, "Bats", 20, 4, 1, 7, randomGold(2, 8),
                 new EnemyMove("Bite", 1, 84, MoveType.LIGHT, false, MoveEffect.NONE, 0, 0),
                 new EnemyMove("Wing Buffet", 2, 74, MoveType.NORMAL, true, MoveEffect.NONE, 0, 0),
                 new EnemyMove("Screech", 1, 78, MoveType.STATUS, false, MoveEffect.NONE, 0, 0));
     }
 
     public static Enemy goblin() {
-        return new Enemy(EnemyType.GOBLIN, "Goblin", 20, 5, 2, 10, randomGold(4, 8),
+        return new Enemy(EnemyType.GOBLIN, "Goblin", 30, 5, 2, 10, randomGold(8, 16),
                 new EnemyMove("Knife Stab", 2, 80, MoveType.LIGHT, false, MoveEffect.NONE, 0, 0),
                 new EnemyMove("Wild Swing", 4, 58, MoveType.NORMAL, true, MoveEffect.NONE, 0, 0),
                 new EnemyMove("Pocket Sand", 0, 52, MoveType.STATUS, false, MoveEffect.POCKET_SAND, 50, 0));
     }
 
     public static Enemy wolf() {
-        return new Enemy(EnemyType.WOLF, "Wolf", 24, 6, 2, 13, randomGold(4, 7),
+        return new Enemy(EnemyType.WOLF, "Wolf", 35, 6, 2, 13, randomGold(8, 14),
                 new EnemyMove("Snap Bite", 2, 82, MoveType.LIGHT, false, MoveEffect.NONE, 0, 0),
                 new EnemyMove("Lunge", 4, 68, MoveType.NORMAL, true, MoveEffect.NONE, 0, 0),
                 new EnemyMove("Pounce", 5, 56, MoveType.HEAVY, true, MoveEffect.NONE, 0, 0));
     }
 
     public static Enemy slime() {
-        return new Enemy(EnemyType.SLIME, "Slime", 42, 4, 5, 20, randomGold(8, 15),
+        return new Enemy(EnemyType.SLIME, "Slime", 60, 4, 5, 20, randomGold(20, 50),
                 new EnemyMove("Slam", 2, 76, MoveType.NORMAL, true, MoveEffect.NONE, 0, 0),
                 new EnemyMove("Body Press", 4, 62, MoveType.HEAVY, true, MoveEffect.NONE, 0, 0),
                 new EnemyMove("Acid Splash", 3, 70, MoveType.MAGIC, false, MoveEffect.NONE, 0, 0));
     }
 
     public static Enemy skeleton() {
-        return new Enemy(EnemyType.SKELETON, "Skeleton", 30, 7, 4, 17, randomGold(6, 10),
+        return new Enemy(EnemyType.SKELETON, "Skeleton", 45, 7, 4, 17, randomGold(12, 20),
                 new EnemyMove("Rusty Slash", 3, 78, MoveType.NORMAL, true, MoveEffect.NONE, 0, 0),
                 new EnemyMove("Shield Bash", 5, 62, MoveType.HEAVY, true, MoveEffect.NONE, 0, 0),
                 new EnemyMove("Bone Rattle", 1, 74, MoveType.STATUS, false, MoveEffect.NONE, 0, 0));
     }
 
     public static Enemy orc() {
-        return new Enemy(EnemyType.ORC, "Orc", 34, 8, 3, 19, randomGold(8, 14),
+        return new Enemy(EnemyType.ORC, "Orc", 50, 8, 3, 19, randomGold(16, 28),
                 new EnemyMove("Axe Chop", 4, 76, MoveType.NORMAL, true, MoveEffect.NONE, 0, 0),
                 new EnemyMove("Cleaver Drop", 6, 58, MoveType.HEAVY, true, MoveEffect.NONE, 0, 0),
                 new EnemyMove("War Cry", 2, 80, MoveType.STATUS, false, MoveEffect.NONE, 0, 0));
     }
 
     public static Enemy ogre() {
-        return new Enemy(EnemyType.OGRE, "Ogre", 52, 11, 4, 30, randomGold(12, 20),
+        return new Enemy(EnemyType.OGRE, "Ogre", 75, 11, 4, 30, randomGold(24, 40),
                 new EnemyMove("Club Smash", 7, 60, MoveType.HEAVY, true, MoveEffect.NONE, 0, 0),
                 new EnemyMove("Backhand", 4, 74, MoveType.NORMAL, true, MoveEffect.NONE, 0, 0),
                 new EnemyMove("Ground Stomp", 3, 82, MoveType.STATUS, false, MoveEffect.NONE, 0, 0));
     }
 
     public static Enemy caveTroll() {
-        return new Enemy(EnemyType.CAVE_TROLL, "Cave Troll", 64, 12, 6, 36, randomGold(15, 24),
+        return new Enemy(EnemyType.CAVE_TROLL, "Cave Troll", 90, 12, 6, 36, randomGold(30, 48),
                 new EnemyMove("Maul", 7, 66, MoveType.HEAVY, true, MoveEffect.NONE, 0, 0),
                 new EnemyMove("Crushing Grab", 5, 62, MoveType.GRAPPLE, true, MoveEffect.NONE, 0, 0),
                 new EnemyMove("Regenerate", 0, 100, MoveType.STATUS, false, MoveEffect.SELF_HEAL, 100, 8));
     }
 
     public static Enemy giantSnake() {
-        return new Enemy(EnemyType.SNAKE, "Giant Snake", 34, 8, 3, 42, randomGold(15, 25),
+        return new Enemy(EnemyType.SNAKE, "Giant Snake", 55, 8, 3, 42, randomGold(30, 50),
                 new EnemyMove("Bite", 3, 78, MoveType.LIGHT, false, MoveEffect.NONE, 0, 0),
                 new EnemyMove("Tail Lash", 5, 54, MoveType.NORMAL, true, MoveEffect.NONE, 0, 0),
                 new EnemyMove("Constrict", 2, 60, MoveType.GRAPPLE, false, MoveEffect.CONSTRICT, 100, 0));
     }
 
     public static Enemy necromancer() {
-        return new Enemy(EnemyType.NECROMANCER, "Necromancer", 86, 13, 7, 80, randomGold(40, 60),
+        return new Enemy(EnemyType.NECROMANCER, "Necromancer", 120, 13, 7, 80, 0,
                 new EnemyMove("Bone Spear", 7, 84, MoveType.MAGIC, false, MoveEffect.NONE, 0, 0),
                 new EnemyMove("Grave Lash", 5, 76, MoveType.NORMAL, true, MoveEffect.NONE, 0, 0),
                 new EnemyMove("Soul Drain", 5, 72, MoveType.MAGIC, false, MoveEffect.SOUL_DRAIN, 100, 5),
                 new EnemyMove("Raise Dead", 0, 100, MoveType.STATUS, false, MoveEffect.SELF_HEAL, 100, 10),
                 new EnemyMove("Black Flame", 8, 64, MoveType.MAGIC, false, MoveEffect.NONE, 0, 0));
+    }
+
+    public static Enemy golem() {
+        return new Enemy(EnemyType.GOLEM, "Golem", 80, 12, 8, 40, randomGold(30, 50),
+                new EnemyMove("Granite Fist", 8, 75, MoveType.HEAVY, true, MoveEffect.NONE, 0, 0),
+                new EnemyMove("Earthquake", 4, 90, MoveType.NORMAL, false, MoveEffect.NONE, 0, 0));
+    }
+
+    public static Enemy mimic() {
+        return new Enemy(EnemyType.MIMIC, "Mimic", 60, 14, 2, 45, randomGold(50, 80),
+                new EnemyMove("Chomp", 10, 85, MoveType.NORMAL, true, MoveEffect.NONE, 0, 0),
+                new EnemyMove("Tongue Lash", 6, 70, MoveType.LIGHT, false, MoveEffect.NONE, 0, 0));
+    }
+
+    public static Enemy dragon() {
+        return new Enemy(EnemyType.DRAGON, "Dragon", 150, 20, 5, 100, 100,
+                new EnemyMove("Inferno Breath", 15, 45, MoveType.MAGIC, false, MoveEffect.NONE, 0, 0),
+                new EnemyMove("Tail Sweep", 10, 50, MoveType.HEAVY, false, MoveEffect.NONE, 0, 0),
+                new EnemyMove("Claw", 5, 70, MoveType.NORMAL, true, MoveEffect.NONE, 0, 0));
     }
 
     private static int randomGold(int min, int max) {
@@ -1764,6 +1885,490 @@ class EnemyMove {
     public int getEffectPower() { return effectPower; }
 }
 
-enum EnemyType { BAT, GOBLIN, WOLF, SLIME, SKELETON, ORC, OGRE, CAVE_TROLL, SNAKE, NECROMANCER }
+enum EnemyType { BAT, GOBLIN, WOLF, SLIME, SKELETON, ORC, OGRE, CAVE_TROLL, SNAKE, NECROMANCER, GOLEM, MIMIC, DRAGON }
 enum MoveType { LIGHT, NORMAL, HEAVY, GRAPPLE, STATUS, MAGIC }
 enum MoveEffect { NONE, POCKET_SAND, CONSTRICT, SELF_HEAL, SOUL_DRAIN }
+
+
+/* =========================================================================================
+   PILLAR 9: THE BROKER OF SOULS (MerchantManager)
+   ========================================================================================= */
+
+class MerchantManager {
+
+    public void handleMerchant(Player player, Room room) {
+            System.out.println("\n--- THE WANDERING BAZAAR ---");
+            ImageGallery.reveal("Goblin"); // <-- TENTH PILLAR HOOK
+            System.out.println("The Goblin grins, revealing a mouth of jagged, golden teeth.");
+            System.out.println("\"Ah, a traveler! I have many shiny things... Or perhaps you have shiny things for me?\"");
+            
+            while (true) {
+                System.out.println("\nGold: " + player.getGold());
+                System.out.println("1. Buy");
+                System.out.println("2. Sell");
+                System.out.println("0. Leave");
+                System.out.print("Choose: ");
+                String answer = DarkHolds.input.nextLine().trim();
+                
+                if (answer.equals("1")) {
+                    buyMenu(player, room);
+                } else if (answer.equals("2")) {
+                    sellMenu(player);
+                } else if (answer.equals("0")) {
+                    System.out.println("\"Safe travels in the dark, friend! Come back if you survive!\"");
+                    break;
+                } else {
+                    System.out.println("Invalid choice.");
+                }
+            }
+        }
+    
+    private void buyMenu(Player player, Room room) {
+        boolean isFloor3 = room.getId().startsWith("f3");
+        List<GameItem> wares = new ArrayList<>();
+        List<Integer> prices = new ArrayList<>();
+        
+        wares.add((GameItem) Items.smallPotion()); prices.add(20);
+        wares.add((GameItem) Items.torch());       prices.add(15);
+        wares.add((GameItem) Items.sword());       prices.add(40);
+        wares.add((GameItem) Items.shield());      prices.add(50);
+        wares.add((GameItem) Items.scrollOfEscape()); prices.add(30);
+        
+        if (isFloor3) {
+            wares.add((GameItem) Items.bigPotion());   prices.add(50);
+            wares.add((GameItem) Items.greatSword());  prices.add(85);
+            wares.add((GameItem) Items.armor());       prices.add(100);
+            wares.add((GameItem) Items.scrollOfFireball()); prices.add(60);
+        }
+        
+        while (true) {
+            System.out.println("\n--- BUY ---");
+            System.out.println("Your Gold: " + player.getGold());
+            for (int i = 0; i < wares.size(); i++) {
+                System.out.println((i + 1) + ". " + wares.get(i).getName() + " - " + prices.get(i) + "g (" + wares.get(i).getDescription() + ")");
+            }
+            System.out.println("0. Back");
+            System.out.print("Choose item to buy: ");
+            String answer = DarkHolds.input.nextLine().trim();
+            if (answer.equals("0")) break;
+            
+            try {
+                int choice = Integer.parseInt(answer) - 1;
+                if (choice >= 0 && choice < wares.size()) {
+                    int cost = prices.get(choice);
+                    if (player.getGold() >= cost) {
+                        player.addGold(-cost);
+                        player.addItem(wares.get(choice));
+                        System.out.println("You bought the " + wares.get(choice).getName() + " for " + cost + " gold.");
+                    } else {
+                        System.out.println("\"You're too poor for that one!\"");
+                    }
+                } else {
+                    System.out.println("Invalid choice.");
+                }
+            } catch (NumberFormatException e) {
+                System.out.println("Invalid choice.");
+            }
+        }
+    }
+    
+    private void sellMenu(Player player) {
+        while (true) {
+            System.out.println("\n--- SELL ---");
+            System.out.println("Your Gold: " + player.getGold());
+            if (player.getInventory().isEmpty()) {
+                System.out.println("You have nothing to sell.");
+                return;
+            }
+            
+            for (int i = 0; i < player.getInventory().size(); i++) {
+                Item item = player.getInventory().get(i);
+                int value = getSellValue(item);
+                if (value > 0) {
+                    System.out.println((i + 1) + ". " + item.getName() + " - Offers " + value + "g");
+                } else {
+                    System.out.println((i + 1) + ". " + item.getName() + " - Refused");
+                }
+            }
+            System.out.println("0. Back");
+            System.out.print("Choose item to sell: ");
+            String answer = DarkHolds.input.nextLine().trim();
+            if (answer.equals("0")) break;
+            
+            try {
+                int choice = Integer.parseInt(answer) - 1;
+                if (choice >= 0 && choice < player.getInventory().size()) {
+                    Item item = player.getInventory().get(choice);
+                    if (item.getName().equalsIgnoreCase("Stick")) {
+                        System.out.println("\"That's a pretty nice stick, but no, I don't want to buy it.\"");
+                    } else if (item instanceof KeyItem) {
+                        System.out.println("\"I don't touch keys. I'm a merchant, not a jailer!\"");
+                    } else {
+                        int value = getSellValue(item);
+                        if (value > 0) {
+                            player.addGold(value);
+                            player.removeItem(choice);
+                            System.out.println("You sold the " + item.getName() + " for " + value + " gold.");
+                        }
+                    }
+                } else {
+                    System.out.println("Invalid choice.");
+                }
+            } catch (NumberFormatException e) {
+                System.out.println("Invalid choice.");
+            }
+        }
+    }
+    
+    private int getSellValue(Item item) {
+        String name = item.getName().toLowerCase();
+        if (name.contains("stick") || item instanceof KeyItem) return 0;
+        if (name.contains("torch") || name.contains("small potion") || name.contains("decayed armor")) return 10;
+        if (name.contains("sword") && !name.contains("great")) return 20;
+        if (name.contains("shield") && !name.contains("dragon")) return 20;
+        if (name.contains("big potion")) return 25;
+        if (name.contains("scroll")) return 30;
+        if (name.contains("great sword") || name.contains("armor") || name.contains("dragon scale")) return 30;
+        if (name.contains("ancient relic")) return 50;
+        return 5; 
+    }
+}
+
+/* =========================================================================================
+   PILLAR 10: THE PHANTOM GALLERY (ImageGallery)
+   ========================================================================================= */
+
+
+class ImageGallery {
+    private static final Map<String, String> gallery = new HashMap<>();
+
+    static {
+        gallery.put("Goblin", """
+         ,      ,
+       /(.-""-.)\\
+ |\\  \\/     \\/   /|
+ | \\ / =.  .= \\  / |
+  \\ \\  o\\/o  \\/  /
+   \\_, '-/  \\-' ,_/
+     /   \\__/   \\
+     \\ \\__/\\__/ /
+   ___\\ \\|--|/ /___
+ /`    \\      /    `\\
+/       '----'       \\
+""");
+
+        gallery.put("Cave Troll", """
+                  .::::::::..
+                .::''''''''''::.
+               .::  XXXXXXXX  ::.
+              .::  [  o  o  ]  ::.
+              :::.  \\  --  /  .:::
+              '::::. '----' .::::'
+             ___/::::::::::::::\\___
+          .-'  |     ######     |  '-.
+         /    / \\    ######    / \\  \\
+        |    |   \\   ######   /   |    |
+        |    |    \\  ######  /    |    |
+        |    |     \\ ###### /     |    |
+        |    |      \\######/      |    |
+         \\    \\      '----'      /    /
+          '-._ \\       ||||      / _.-'
+              \\ \\     ||||     / /
+               \\ \\    ||||    / /
+                \\_\\  /####\\  /_/
+                [###|      |###]
+                '---'      '---'
+""");
+
+        gallery.put("Skeleton", """
+              :.                
+             :#*=:              
+     :=.      +-#.              
+     -%=.  ..-=#+.==:           
+      =-  -+#%%#+#+:=-          
+       *-.  #@%=++++*=          
+       ..   %@#++#+:+.          
+            +*=@-+-:=           
+            .:.%..  =.          
+            -@%%#@* :          
+            :%@%#%=  .:         
+           -##-:::+: .-:        
+           :-#    := .%=        
+           +.=     +  =+        
+          --       =.  ::       
+         -=:       -* -.=.      
+         +-        .* #- *-+    
+        .+          # =@#*+     
+        =-          #  -:       
+      ..#.           :@#:         
+      :** .:=-        
+     :##=                       
+     .+=   
+""");
+
+        gallery.put("Bats", """
+        /\\                 /\\
+       / \\'._  (\\_/)   _.'/ \\
+      /_.''._'--('.')--'_.''._\\
+      | \\_ / `;=/ " \\=;` \\ _/ |
+       \\/ `\\__|`\\___/`|__/`\\/
+               \\(/|\\)/
+""");
+
+        gallery.put("Ogre", """
+            .=-::.              
+          .+%+:.=*: ..          
+        :-#@@%*+=#=-:..         
+       :*=#@@%**#%+-.::...      
+      .+%%%%@@@%#=::**---::     
+    .==%*@%++*%+:::+@@+-*--=    
+    -*=*%%  ##***+-+*@==%+=+    
+    :++*=.  #%#+****##* .+-=    
+   .+*=    .%@%%%%@@*=*-=*--:   
+  .+*+*-   =@@@%##%%++#*-+*** .=%@@:    #%%         
+       :+*##*###=--+%%%%+: 
+""");
+
+        gallery.put("Orc", """
+                 .--:           
+              .::-+++::         
+               =+#%#@#+         
+              .+#%@@@@@*:       
+             =#@@@@@.@%+=-.     
+            :#%%%%@.%#%%%%#.    
+            -%@@@@@%#@@@@@%%.   
+             *@@%@@%%@@@@@@@+   
+             :%#*@##@@@@*%@%#=  
+              ##*##@@@@:  #@#*- 
+              #@%##%%@@=  #%%%- 
+             .#@@@@@@@@#  -@@@. 
+   -:...     #@@.@%%@..@. -@.=  
+  :@@@@%*+++*@...@%%%@@@=.#..=  
+  +@#=   :  =@...@@@@...##@@@##%
+:*@@=-+*=. :%@..@@@%%%@@@+**.   
+-*+#++:.   #@...@@@@@@@@@.      
+          =@.....@%.@..@@+      
+          #.....@*#@.@@@@@.     
+          #....@-=#@%%@...-     
+          %....# +%#*@@...@-    
+          +....#     #.....@    
+          :@..@:     .*......   
+          .@...        %....    
+         :%....        .*..@.   
+        =#%@%* #..=   
+        -=-:             #..%:  
+                         +%%%#. 
+                         .#@%#.
+""");
+
+        gallery.put("Slime", """
+      _________
+    /           \\
+   /   I    I     \\
+  |               |
+  |               |
+   \\   \\____/    /
+    \\___________/
+""");
+
+        gallery.put("Necromancer", """
+           .. .        .        
+           ..--        -.       
+            +=:      ..==:      
+           +#++      :=*+-      
+        :=*%+-+-      -*-       
+        =*+*#++#+--+-*++        
+       .*@@%%%#+=%#*-:::        
+       ++*@#@*#: =*=  -.        
+       *+=%%%#** .*:  =         
+       *:-*@@%#@  +   * =*#@%##%#     -         
+      -#%@%%%*@%=   .:         
+    .+#@@@#%@##%#:  =:         
+      .:-=-:.:.  
+""");
+
+        gallery.put("Giant Snake", """
+           ____
+          /  __\\
+          | /
+          | |
+   _______| |
+  /  _______|
+ /  /
+ \\  \\__
+  \\____\\
+""");
+
+        gallery.put("Iron Key", """
+O--====--++--
+           ||
+""");
+        gallery.put("Ancient Relic", gallery.get("Iron Key"));
+
+        gallery.put("Small Potion", """
+       _|_
+      |___|
+     / ~ ~ \\
+    |___*___|
+    \\_____/
+""");
+        gallery.put("Big Potion", gallery.get("Small Potion"));
+
+        gallery.put("Scroll of Escape", """
+       _________
+      /        /
+     /        /
+    / '' ''  /
+   /        /
+  /________/
+""");
+
+        gallery.put("Stick", """
+         |
+         | /
+         |/
+      \\ |
+       \\|
+         |
+""");
+
+        gallery.put("Sword", """
+         /\\
+        /  \\
+        ||||
+        ||||
+        ||||
+        ||||
+        ||||
+        ||||
+       /____\\
+         ||
+         ||
+""");
+        gallery.put("Great Sword", gallery.get("Sword"));
+
+        gallery.put("Armor", """
+               .=*=       
+      --+#%@@@*+=+#*.     
+    -*%@%%%%%#*:..-*#=    
+   -%###*#####*++-=+*#-   
+   *%###*+++#%%##*#*--*:  
+  -%@#%#*++#*+*##%@#++##: 
+ .%@.%##**%*++**%@@@#%##*:
+ -@@@@%##@*==##%@@+.#@%#%%
+ #@@@###%%**+%%%@@-  +@%%@
+=@@@% =@@%%%#%@@@@:  -#==+
+%%@@= =@@@@@%@@@@@.  -*==#
+%@@* *@@@@@%@@@@@-  -%*#+
+%@#  :@%@%%#####*#+  :%#@:
+%%-  #@%@@#**####%%- :@%# 
+@#: .@@%@@@#*###%%%#*#%%= 
+**. -@@%%%@#++++***#+-%#: 
+    =%@@=.%@@%@@@@%*-+#-  
+          .:::..    .:. 
+""");
+        gallery.put("Decayed Armor", gallery.get("Armor"));
+
+        gallery.put("Shield", """
+       _______
+      /       \\
+     /         \\
+    |   _____   |
+    |  |     |  |
+    |  |_____|  |
+    \\         /
+     \\_______/
+""");
+        gallery.put("Dragon Scale Shield", gallery.get("Shield"));
+
+        gallery.put("Torch", """
+         ( )
+        (   )
+        \\_//
+          |
+          |
+          |
+          |
+""");
+
+        gallery.put("Scroll of Fireball", """
+       _________
+      /        /
+     / ( )    /
+    / (   )  /
+   /  \\_/  /
+  /________/
+""");
+
+        String blankScroll = """
+       _________
+      /        /
+     /        /
+    /        /
+   /        /
+  /________/
+""";
+        gallery.put("Scroll of Stealth", blankScroll);
+        gallery.put("Scroll of Life Steal", blankScroll);
+        gallery.put("Scroll of Level Up", blankScroll);
+        
+        gallery.put("Golem", """
+             :.                 
+          :+%*+::- ::.          
+      .+*+*@@@*-*@*%+=:.        
+      %%%%#%%###=-:-##+-:.      
+     -@@@@@##+*#+=-:+@%#+=      
+    =@@%@.@@@%**#*++@.%+-.=..   
+  :+@@@@@.%%@@%#%#=*@=@@#*+*:   
+ :%*#@@..* #.@%#%%@=  @@@*-:.. 
+ %%#*%%@.: +@@@%*+@*-. +@%*#*+- 
+.@@%#%@@= =%#%@@%*%#*+ :#%*.-+* :@%*%%+ .@%*+:   #@%#- *#@@#.  
+  =%@%*: :@%*+* :@@%#=.  .     
+         -@%%#%  .@.@%*:        
+         :@#%%* +@@#=.        
+       .++*+:-* #%=-+:.       
+       ++=#=--=   +@*:*#=: 
+""");
+
+        gallery.put("Mimic", """
+                                              
+                                              
+                                              
+     ..:-----::-++*#+-::-=+:                  
+   .=***=#@%##%%%%%%@%%%@@%##+-               
+  .+###**-%@####%#**###%#%%@@#%-              
+  +##****++%@%**++#-+#-*:+#+%##+              
+ :*#*****=-*%%%=+==*:+:*+#*+*#**:             
+ .*####*=+%@@@@#:%:+**%@@@@@%##@-      :::    
+  :+#*++#%@.@@#-=%@%...@@@@@%##:       +:=+.  
+   -**%@%*%@@#*%.....@@@%####+=.       .+-##  
+   :*@@@#**%@@.@#...@@@@%%####**=       .**%- 
+   .-***+==--+#*++*+%@@@@@@@@%##%*:      :#%* +#%#****-*@@###=%*#=##*@@%*%**+=+*+=+*%@. 
+    =*###***:*@@@%%@%%@%@@@@@@@%: :=**###%*.  
+    +*#****+:#@%%@@@@@@@@@@@@@@@:      ..     
+    =*###**+:%@%%%%%@@@%@@@@@@@@:
+    +*####*+:%@%%%@@@%##%@@@@@@@=
+   .+#####*+-@@@@@@@#***#%@@@@@#*.
+   =***++==-=@@@@@@%#*+*#%@..@@@@@@@%*=.
+    ...:::::+**++++=====---::::...
+""");
+
+        gallery.put("Dragon", """
+                               
+                     *++++=-:  
+   .:-=+***.        :#*#*++=-. 
+ :-++++*+*+*+:.::.-*%*+=*-:.   
+     ----+=:-*=+#%@#*-.::=     
+        :.    .+#@%#.          
+               -.*++#-         
+                 .   :-:.      
+                               
+""");
+    }
+
+    public static void reveal(String trueName) {
+        if (gallery.containsKey(trueName)) {
+            System.out.println(gallery.get(trueName));
+        }
+    }
+}
