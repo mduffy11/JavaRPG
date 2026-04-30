@@ -1,7 +1,7 @@
 import java.util.*;
 
 /**
- * Dark Holds - The Grand Monolith (TEN Pillars + New Bosses)
+ * Dark Holds - The Grand Monolith (TEN Pillars + New Bosses + Cat Easter Egg)
  * ----------------------------------------------
  * The Ten Pillars of the Crypt, bound into a single massive scroll.
  */
@@ -46,7 +46,6 @@ class Game {
     private void introStory() {
         System.out.println("========================================");
         System.out.println("           DARK HOLDS");
-        System.out.println("   THE GRAND MONOLITH BUILD (10 PILLARS)");
         System.out.println("========================================");
         System.out.println("You were once an ordinary villager with no great battle experience.");
         System.out.println("While traveling near ancient ruins, you stepped on a hidden teleportation trap.");
@@ -82,6 +81,20 @@ class Game {
         for (Room r : f3Rooms) { rooms.put(r.getId(), r); }
 
         distributeGuaranteedLoot();
+        
+        // --- INJECT THE RANDOM WANDERING CAT ---
+        List<Room> possibleCatRooms = new ArrayList<>();
+        for (Room r : rooms.values()) {
+            // The cat avoids Merchants and the Necromancer
+            if (!r.isMerchantRoom() && !r.getId().equals("f3_necro_altar")) {
+                possibleCatRooms.add(r);
+            }
+        }
+        if (!possibleCatRooms.isEmpty()) {
+            Room catRoom = possibleCatRooms.get(random.nextInt(possibleCatRooms.size()));
+            catRoom.setHasCat(true);
+        }
+
         player.setCurrentRoom("f1safe");
         player.setPreviousRoom("f1safe");
         running = true;
@@ -148,7 +161,7 @@ class Game {
             } else {
                 System.out.println(current.getDisplayDescription());
             }
-            
+
             if (current.hasKeyReward() && !current.isRewardsCollected()) {
                 System.out.println("\n>> You spot an Iron Key resting somewhere in this room! <<");
             }
@@ -181,7 +194,7 @@ class Game {
                 boolean beginsBattle = promptBeforeBattle(current);
                 if (!beginsBattle) {
                     player.setCurrentRoom(player.getPreviousRoom());
-                    continue;
+                    continue; // You ran away! The cat stays hidden.
                 }
 
                 BattleResult result = battleManager.handleBattle(player, current);
@@ -189,7 +202,35 @@ class Game {
                     gameOver("You died in battle against " + current.getEnemy().getName() + ".");
                     return;
                 }
-                if (result == BattleResult.ESCAPED) continue;
+                if (result == BattleResult.ESCAPED) continue; // You fled the battle! The cat stays hidden.
+            }
+
+            // CAT ENCOUNTER LOGIC (Triggered AFTER puzzles and battles)
+            if (current.hasCat() && !current.isCatResolved()) {
+                System.out.println();
+                ImageGallery.reveal("Cat");
+                if (current.hasEnemy() && current.getEnemy().isDefeated()) {
+                    System.out.println("With the room pacified, a small, fluffy dungeon cat emerges from hiding.");
+                } else {
+                    System.out.println("You spot a small, fluffy dungeon cat sitting in the corner.");
+                }
+                
+                while (true) {
+                    System.out.print("Do you want to pick it up? (Y/N): ");
+                    String catAns = DarkHolds.input.nextLine().trim().toUpperCase();
+                    if (catAns.equals("Y")) {
+                        System.out.println("The cat seems happy to have found you.");
+                        player.addItem(Items.cat());
+                        current.setCatResolved(true);
+                        break;
+                    } else if (catAns.equals("N")) {
+                        System.out.println("The cat is frightened and runs off into the darkness.");
+                        current.setCatResolved(true);
+                        break;
+                    } else {
+                        System.out.println("Invalid choice.");
+                    }
+                }
             }
 
             revealRoomRewards(current);
@@ -234,7 +275,7 @@ class Game {
         if (room.hasKeyReward()) {
             System.out.println("\nYou discover an Iron Key hidden here.");
             ImageGallery.reveal("Iron Key");
-            player.addItem(Items.floorOneIronKey()); // <-- Now goes straight to inventory!
+            player.addItem(Items.floorOneIronKey()); 
             foundSomething = true;
         }
 
@@ -404,6 +445,9 @@ class Game {
     private void victory() {
         System.out.println("\n========================================\nFLOOR 3 CLEARED\n========================================");
         System.out.println("You have vanquished the Necromancer and cleared the third floor.");
+        if (player.hasItem("Cat")) {
+            System.out.println("The Cat rubs against your leg, purring. It is happy to have escaped the dungeon as well!");
+        }
         System.out.println("For this prototype build, your descent ends here.");
         running = false;
     }
@@ -1451,6 +1495,8 @@ class Room {
     private final boolean puzzleRoom;
     private boolean puzzleSolved;
     private boolean merchantRoom;
+    private boolean hasCat;
+    private boolean catResolved;
 
     public Room(String id, String name, String description, boolean preLock, boolean keyEligible) {
         this.id = id;
@@ -1467,6 +1513,8 @@ class Room {
         this.puzzleRoom = id.contains("p_");
         this.puzzleSolved = false;
         this.merchantRoom = false;
+        this.hasCat = false;
+        this.catResolved = false;
     }
 
     public void addNeighbor(String neighborId) { if (!neighborIds.contains(neighborId)) neighborIds.add(neighborId); }
@@ -1503,6 +1551,10 @@ class Room {
     public void setPuzzleSolved(boolean puzzleSolved) { this.puzzleSolved = puzzleSolved; }
     public boolean isMerchantRoom() { return merchantRoom; }
     public void setMerchantRoom(boolean merchantRoom) { this.merchantRoom = merchantRoom; }
+    public boolean hasCat() { return hasCat; }
+    public void setHasCat(boolean hasCat) { this.hasCat = hasCat; }
+    public boolean isCatResolved() { return catResolved; }
+    public void setCatResolved(boolean catResolved) { this.catResolved = catResolved; }
 }
 
 /* =========================================================================================
@@ -1531,6 +1583,7 @@ final class Items {
     public static DragonScaleShieldItem dragonScale() { return new DragonScaleShieldItem(); }
     public static KeyItem floorOneIronKey() { return new KeyItem("locked_hall_iron_key", "Iron Key"); }
     public static KeyItem ancientRelic() { return new KeyItem("dragon_lair_secret_door", "Ancient Relic"); }
+    public static CatItem cat() { return new CatItem(); }
 
     public static int getPassiveAttackBonus(Player player) {
         int total = 0;
@@ -1799,6 +1852,28 @@ class KeyItem extends GameItem {
         this.keyId = keyId;
     }
     public String getKeyId() { return keyId; }
+}
+
+class CatItem extends GameItem {
+    public CatItem() {
+        super("Cat", ItemType.SPECIAL, 4, "A fluffy dungeon cat. It meows softly.");
+    }
+    @Override public boolean canUseInBattle() { return true; }
+    @Override public boolean canUseOutsideBattle() { return true; }
+    @Override public boolean use(Player player, ItemContext context) {
+        if (context.isInBattle() && context.getCurrentEnemy() != null) {
+            System.out.println("You toss the Cat at the " + context.getCurrentEnemy().getName() + "!");
+            context.getCurrentEnemy().takeDamage(4);
+            System.out.println("The Cat viciously scratches the enemy for 4 damage... and then runs away into the darkness!");
+            context.setEscapedByItem(false); 
+            return true; 
+        } else {
+            ImageGallery.reveal("Cat");
+            System.out.println("You pet the Cat. It purrs loudly. You feel a tiny bit better. (+1 HP)");
+            player.heal(1);
+            return false; 
+        }
+    }
 }
 
 /* =========================================================================================
@@ -2078,6 +2153,11 @@ class MerchantManager {
                     Item item = player.getInventory().get(choice);
                     if (item.getName().equalsIgnoreCase("Stick")) {
                         System.out.println("\"That's a pretty nice stick, but no, I don't want to buy it.\"");
+                    } else if (item.getName().equalsIgnoreCase("Cat")) {
+                        System.out.println("\"Hmm... that looks tasty,\" the Goblin mutters, drooling slightly.");
+                        player.addGold(10);
+                        player.removeItem(choice);
+                        System.out.println("You sold the Cat for 10 gold. You monster.");
                     } else if (item instanceof KeyItem) {
                         System.out.println("\"I don't touch keys. I'm a merchant, not a jailer!\"");
                     } else {
@@ -2100,6 +2180,7 @@ class MerchantManager {
     private int getSellValue(Item item) {
         String name = item.getName().toLowerCase();
         if (name.contains("stick") || item instanceof KeyItem) return 0;
+        if (name.contains("cat")) return 10;
         if (name.contains("torch") || name.contains("small potion") || name.contains("decayed armor")) return 10;
         if (name.contains("sword") && !name.contains("great")) return 20;
         if (name.contains("shield") && !name.contains("dragon")) return 20;
@@ -2115,11 +2196,23 @@ class MerchantManager {
    PILLAR 10: THE PHANTOM GALLERY (ImageGallery)
    ========================================================================================= */
 
-
 class ImageGallery {
     private static final Map<String, String> gallery = new HashMap<>();
 
     static {
+        gallery.put("Cat", """
+ ,_     _
+ |\\\\_,-~/
+ / _  _ |    ,--.
+(  @  @ )   / ,-'
+ \\\\  _T_/-._( (
+ /         `. \\\\
+|         _  \\\\ |
+ \\\\ \\\\ ,  /      |
+  || |-_\\\\__   /
+ ((_/`(____,-'
+""");
+
         gallery.put("Goblin", """
          ,      ,
        /(.-""-.)\\
