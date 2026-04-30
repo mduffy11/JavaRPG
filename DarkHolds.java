@@ -206,11 +206,19 @@ class Game {
     private void showPlayerStatus() {
         System.out.println("\nPlayer: " + player.getName());
         System.out.println("HP: " + player.getHp() + "/" + player.getMaxHp());
-        System.out.println("Attack: " + player.getAttack());
-        System.out.println("Defense: " + player.getDefense());
+        
+        int atkBonus = Items.getPassiveAttackBonus(player);
+        int baseAtk = player.getAttack() - atkBonus;
+        if (atkBonus > 0) System.out.println("Attack: " + baseAtk + " (+" + atkBonus + ")");
+        else System.out.println("Attack: " + baseAtk);
+        
+        int defBonus = Items.getPassiveDefenseBonus(player);
+        int baseDef = player.getDefense() - defBonus;
+        if (defBonus > 0) System.out.println("Defense: " + baseDef + " (+" + defBonus + ")");
+        else System.out.println("Defense: " + baseDef);
+        
         System.out.println("Level: " + player.getLevel() + "   XP: " + player.getXp());
         System.out.println("Gold: " + player.getGold());
-        System.out.println("Has Key: " + player.hasAnyKey());
     }
 
     private void revealRoomRewards(Room room) {
@@ -226,7 +234,7 @@ class Game {
         if (room.hasKeyReward()) {
             System.out.println("\nYou discover an Iron Key hidden here.");
             ImageGallery.reveal("Iron Key");
-            player.addKey(Items.floorOneIronKey());
+            player.addItem(Items.floorOneIronKey()); // <-- Now goes straight to inventory!
             foundSomething = true;
         }
 
@@ -772,6 +780,12 @@ class BattleManager {
                 if (action == PlayerAction.ATTACK) {
                     sandInEyes = playerBasicAttack(player, enemy, sandInEyes);
                     actionResolved = true;
+                } else if (action == PlayerAction.SWORD) {
+                    sandInEyes = playerSwordAttack(player, enemy, sandInEyes);
+                    actionResolved = true;
+                } else if (action == PlayerAction.GREAT_SWORD) {
+                    sandInEyes = playerGreatSwordAttack(player, enemy, sandInEyes);
+                    actionResolved = true;
                 } else if (action == PlayerAction.TORCH) {
                     sandInEyes = playerTorchAttack(player, enemy, sandInEyes);
                     actionResolved = true;
@@ -860,6 +874,14 @@ class BattleManager {
             System.out.println(optionNumber + ". Stick Attack");
             options.put(String.valueOf(optionNumber++), PlayerAction.ATTACK);
 
+            if (Items.findWeapon(player, "Sword") != null) {
+                System.out.println(optionNumber + ". Sword Slash");
+                options.put(String.valueOf(optionNumber++), PlayerAction.SWORD);
+            }
+            if (Items.findWeapon(player, "Great Sword") != null) {
+                System.out.println(optionNumber + ". Great Sword Slash");
+                options.put(String.valueOf(optionNumber++), PlayerAction.GREAT_SWORD);
+            }
             if (Items.playerHasTorch(player)) {
                 System.out.println(optionNumber + ". Torch");
                 options.put(String.valueOf(optionNumber++), PlayerAction.TORCH);
@@ -897,6 +919,48 @@ class BattleManager {
         return false;
     }
 
+    private boolean playerSwordAttack(Player player, Enemy enemy, boolean sandInEyes) {
+        WeaponItem sword = Items.findWeapon(player, "Sword");
+        int accuracy = sword != null ? sword.getAccuracy() : 90;
+        if (sandInEyes) {
+            accuracy = Math.max(1, accuracy / 2);
+            System.out.println("You blink through the sand in your eyes and swing your blade blindly!");
+        }
+
+        if (random.nextInt(100) + 1 > accuracy) {
+            System.out.println("Your Sword Slash misses.");
+            return false;
+        }
+
+        int damage = sword != null ? sword.getDamageAgainst(enemy, player) : calculatePlayerDamage(player.getAttack(), 8, enemy.getDefense());
+        enemy.takeDamage(damage);
+        System.out.println("You use Sword Slash and deal " + damage + " damage.");
+        return false;
+    }
+
+    private boolean playerGreatSwordAttack(Player player, Enemy enemy, boolean sandInEyes) {
+        WeaponItem weapon = Items.findWeapon(player, "Great Sword");
+        int accuracy = 60;
+        if (weapon instanceof GreatSwordItem gSword) {
+            accuracy = gSword.getAccuracy(player);
+        }
+        
+        if (sandInEyes) {
+            accuracy = Math.max(1, accuracy / 2);
+            System.out.println("You blink through the sand in your eyes and heave the massive blade blindly!");
+        }
+
+        if (random.nextInt(100) + 1 > accuracy) {
+            System.out.println("Your Great Sword Slash misses.");
+            return false;
+        }
+
+        int damage = weapon != null ? weapon.getDamageAgainst(enemy, player) : calculatePlayerDamage(player.getAttack(), 12, enemy.getDefense());
+        enemy.takeDamage(damage);
+        System.out.println("You use Great Sword Slash and deal " + damage + " damage.");
+        return false;
+    }
+
     private boolean playerTorchAttack(Player player, Enemy enemy, boolean sandInEyes) {
         WeaponItem torch = Items.findWeapon(player, "Torch");
         int accuracy = torch != null ? torch.getAccuracy() : 80;
@@ -911,7 +975,6 @@ class BattleManager {
         }
 
         int damage;
-        // ELEMENTAL AFFINITY OVERRIDE
         if (enemy.getType() == EnemyType.SKELETON || enemy.getType() == EnemyType.GOLEM) {
             damage = 2; 
             System.out.println("The torch flame merely licks the stone and bone, finding no purchase!");
@@ -980,6 +1043,8 @@ class BattleManager {
 
                 Item item = player.getInventory().get(index);
                 if (item.getName().equalsIgnoreCase("Stick")) return new BattleTurnResult(true, playerBasicAttack(player, enemy, sandInEyes), true, false, false, false);
+                if (item.getName().equalsIgnoreCase("Sword")) return new BattleTurnResult(true, playerSwordAttack(player, enemy, sandInEyes), true, false, false, false);
+                if (item.getName().equalsIgnoreCase("Great Sword")) return new BattleTurnResult(true, playerGreatSwordAttack(player, enemy, sandInEyes), true, false, false, false);
                 if (item.getName().equalsIgnoreCase("Torch")) return new BattleTurnResult(true, playerTorchAttack(player, enemy, sandInEyes), true, false, false, false);
 
                 if (item instanceof GameItem gameItem && gameItem.canUseInBattle()) {
@@ -1026,7 +1091,7 @@ class BattleManager {
 
 enum BattleResult { WON, ESCAPED, DIED }
 
-enum PlayerAction { ATTACK, TORCH, ACTION, INVENTORY, RUN }
+enum PlayerAction { ATTACK, SWORD, GREAT_SWORD, TORCH, ACTION, INVENTORY, RUN }
 
 class BattleTurnResult {
     private final boolean turnConsumed, sandInEyes, consumeSandBlindness, dodgeActive, forcedEscape, parryActive;
@@ -1298,7 +1363,6 @@ class Player {
     private String currentRoom;
     private String previousRoom;
     private final ArrayList<Item> inventory;
-    private final ArrayList<KeyItem> keys;
 
     public Player(String name) {
         this.name = name;
@@ -1310,7 +1374,6 @@ class Player {
         this.baseAttack = ATTACK_BY_LEVEL[0];
         this.baseDefense = DEFENSE_BY_LEVEL[0];
         this.inventory = new ArrayList<>();
-        this.keys = new ArrayList<>();
         this.inventory.add(Items.stick());
     }
 
@@ -1340,10 +1403,16 @@ class Player {
         return false;
     }
 
-    public void addKey(KeyItem key) { keys.add(key); }
-    public boolean hasAnyKey() { return !keys.isEmpty(); }
+    // NEW LOGIC: Checks the main inventory for keys instead of a separate list
+    public boolean hasAnyKey() { 
+        for (Item item : inventory) { if (item instanceof KeyItem) return true; }
+        return false; 
+    }
+    
     public boolean hasKey(String keyId) {
-        for (KeyItem key : keys) { if (key.getKeyId().equalsIgnoreCase(keyId)) return true; }
+        for (Item item : inventory) { 
+            if (item instanceof KeyItem key && key.getKeyId().equalsIgnoreCase(keyId)) return true; 
+        }
         return false;
     }
 
@@ -1360,7 +1429,6 @@ class Player {
     public String getPreviousRoom() { return previousRoom; }
     public void setPreviousRoom(String previousRoom) { this.previousRoom = previousRoom; }
     public ArrayList<Item> getInventory() { return inventory; }
-    public ArrayList<KeyItem> getKeys() { return keys; }
 }
 
 /* =========================================================================================
@@ -1449,6 +1517,7 @@ final class Items {
     public static SwordItem sword() { return new SwordItem(); }
     public static GreatSwordItem greatSword() { return new GreatSwordItem(); }
     public static TorchItem torch() { return new TorchItem(); }
+    public static DragonEggItem dragonEgg() { return new DragonEggItem(); }
     public static SmallPotionItem smallPotion() { return new SmallPotionItem(); }
     public static BigPotionItem bigPotion() { return new BigPotionItem(); }
     public static ScrollOfEscapeItem scrollOfEscape() { return new ScrollOfEscapeItem(); }
@@ -1666,8 +1735,16 @@ class ScrollOfLevelUpItem extends GameItem {
     }
 }
 
+class DragonEggItem extends GameItem {
+    public DragonEggItem() {
+        super("Dragon Egg", ItemType.SPECIAL, 0, "Real dragon treasure, can be sold with extreme value.");
+    }
+    @Override public boolean canUseInBattle() { return false; }
+    @Override public boolean canUseOutsideBattle() { return false; }
+}
+
 class StickItem extends WeaponItem {
-    public StickItem() { super("Stick", 2, 95, "Stick Attack", "Default weapon. Weak but reliable."); }
+    public StickItem() { super("Stick", 2, 95, "Stick Attack", "Wooden Stick, hardly can be called a weapon. Weak but reliable."); }
     @Override public int getDamageAgainst(Enemy enemy, Player player) {
         if (enemy != null && enemy.getType() == EnemyType.SLIME) return 2;
         return Math.max(1, getPower() + player.getAttack() - enemy.getDefense());
@@ -1675,11 +1752,11 @@ class StickItem extends WeaponItem {
 }
 
 class SwordItem extends WeaponItem {
-    public SwordItem() { super("Sword", 8, 90, "Sword Slash", "Stronger weapon that can later appear as its own combat action."); }
+    public SwordItem() { super("Sword", 8, 90, "Sword Slash", "Hilt & iron blade, every knight's best argument."); }
 }
 
 class GreatSwordItem extends WeaponItem {
-    public GreatSwordItem() { super("Great Sword", 12, 60, "Great Sword Slash", "A great sword heavier than other weapons but also more effective. Accuracy scales with level."); }
+    public GreatSwordItem() { super("Great Sword", 12, 60, "Great Sword Slash", "A very heavy sword yet more effective. Accuracy scales with level."); }
     @Override public int getAccuracy() { return 60; }
     public int getAccuracy(Player player) {
         if (player == null) return 60;
@@ -1691,7 +1768,7 @@ class GreatSwordItem extends WeaponItem {
 }
 
 class TorchItem extends WeaponItem {
-    public TorchItem() { super("Torch", 4, 80, "Torch", "Weapon and utility item. Strong against slime and useful for dark rooms later."); }
+    public TorchItem() { super("Torch", 4, 80, "Torch", "Weapon and utility item. Strong against slime and useful for dark rooms."); }
     @Override public int getDamageAgainst(Enemy enemy, Player player) {
         if (enemy != null && enemy.getType() == EnemyType.SLIME) return Math.max(10, getPower() + player.getAttack() - enemy.getDefense() + 6);
         return Math.max(1, getPower() + player.getAttack() - enemy.getDefense());
@@ -1704,15 +1781,15 @@ class DecayedArmorItem extends PassiveGearItem {
 }
 
 class ArmorItem extends PassiveGearItem {
-    public ArmorItem() { super("Armor", "Passive +6 Defense while carried.", 0, 6, false); }
+    public ArmorItem() { super("Armor", "Covers most vital body parts, knight's best defense. Passive +6 Defense while carried.", 0, 6, false); }
 }
 
 class ShieldItem extends PassiveGearItem {
-    public ShieldItem() { super("Shield", "Passive +3 Defense while carried. Also supports future Parry work.", 0, 3, true); }
+    public ShieldItem() { super("Shield", "Round, one hand small shield. Passive +3 Defense while carried. Allows to Parry some attacks.", 0, 3, true); }
 }
 
 class DragonScaleShieldItem extends PassiveGearItem {
-    public DragonScaleShieldItem() { super("Dragon Scale", "A dragon scale from defeated dragon and it can be used as shield.", 0, 8, true); }
+    public DragonScaleShieldItem() { super("Dragon Scale", "A dragon scale from defeated dragon can be used as shield. Passive +8 Defense while carried. Allows to Parry some attacks.", 0, 8, true); }
 }
 
 class KeyItem extends GameItem {
