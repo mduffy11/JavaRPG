@@ -1,7 +1,7 @@
 import java.util.*;
 
 /**
- * Dark Holds - The Grand Monolith (TEN Pillars + New Bosses + Cat Easter Egg)
+ * Dark Holds - The Grand Monolith (TEN Pillars + New Bosses + Cat Easter Egg + Endings)
  * ----------------------------------------------
  * The Ten Pillars of the Crypt, bound into a single massive scroll.
  */
@@ -168,6 +168,7 @@ class Game {
             
             showPlayerStatus();
 
+            // ONLY handle puzzles if the room is explicitly a puzzle room (f?p_ pattern)
             if (current.isPuzzleRoom() && !current.isPuzzleSolved() && !current.hasEnemy()) {
                 String id = current.getId();
                 if (id.equals("f1p_weighingScales")) puzzleManager.handleScalesPuzzle(current, player);
@@ -443,12 +444,32 @@ class Game {
     }
 
     private void victory() {
-        System.out.println("\n========================================\nFLOOR 3 CLEARED\n========================================");
-        System.out.println("You have vanquished the Necromancer and cleared the third floor.");
-        if (player.hasItem("Cat")) {
-            System.out.println("The Cat rubs against your leg, purring. It is happy to have escaped the dungeon as well!");
+        System.out.println("\n========================================");
+        System.out.println("FLOOR 3 CLEARED");
+        System.out.println("========================================");
+        
+        System.out.print("The Necromancer is defeated. There is an option to Grab the staff. Do you grab it? (Y/N): ");
+        String staffAns = DarkHolds.input.nextLine().trim().toUpperCase();
+        System.out.println();
+        
+        if (staffAns.equals("Y")) {
+            System.out.println("As the Necromancer falls, you pick up their staff. A cold, dark power surges through your veins. You do not leave the crypt. Instead, you sit upon the profane altar, gazing into the shadows, chanting, patiently awaiting the next foolish adventurer.");
+            System.out.println("\nThe Corrupted Successor");
+            System.out.println("Ending 2 of 4");
+        } else if (player.hasItem("Dragon Egg")) {
+            System.out.println("The egg hatches in your arms, and the baby dragon imprints on you. You leave the dungeon not as a wealthy adventurer, but as a very tired, highly protective single parent.");
+            System.out.println("\nThe Parent");
+            System.out.println("Ending 4 of 4");
+        } else if (player.hasItem("Cat")) {
+            System.out.println("You use your dungeon loot to buy a small, quiet cottage at the edge of the woods. You hang up your sword forever, spending your days napping by a warm hearth with your purring dungeon cat.");
+            System.out.println("\nThe Cozy Retirement");
+            System.out.println("Ending 3 of 4");
+        } else {
+            System.out.println("You have vanquished the Necromancer and cleared the third floor. The heavy crypt doors groan open, revealing the blinding light of the surface world. You step out, lungs filling with fresh air, leaving the dark holds behind you. You return to your village, sell your weapons, and buy a modest plot of land. You spend the rest of your days quietly growing produce, perfectly content to never see another goblin again.");
+            System.out.println("\nThe Farmer");
+            System.out.println("Ending 1 of 4");
         }
-        System.out.println("For this prototype build, your descent ends here.");
+        
         running = false;
     }
 
@@ -468,13 +489,36 @@ class Game {
    ========================================================================================= */
 
 class PuzzleManager {
+    private final Random random = new Random();
+
+    /**
+     * Helper to display a shuffled list of options to the user,
+     * ensuring they cannot just memorize the number choice.
+     */
+    private String getShuffledChoice(String... options) {
+        List<String> list = Arrays.asList(options);
+        Collections.shuffle(list, random);
+        for (int i = 0; i < list.size(); i++) {
+            System.out.println((i + 1) + ". " + list.get(i));
+        }
+        System.out.print("Choose: ");
+        String input = DarkHolds.input.nextLine().trim();
+        try {
+            int choice = Integer.parseInt(input);
+            if (choice > 0 && choice <= list.size()) {
+                return list.get(choice - 1);
+            }
+        } catch (NumberFormatException e) {
+            // Returns empty string below if parsing fails
+        }
+        return "";
+    }
 
     public void handleScalesPuzzle(Room room, Player player) {
         System.out.println("\nThe scale waits for an offering to balance the path.");
-        System.out.println("1. Offer 20 gold\n2. Offer an item from your inventory\n3. Ignore it and try to walk past\nChoose: ");
-        String answer = DarkHolds.input.nextLine().trim();
+        String answer = getShuffledChoice("Offer 20 gold", "Offer an item from your inventory", "Ignore it and try to walk past");
 
-        if (answer.equals("1")) {
+        if (answer.equals("Offer 20 gold")) {
             if (player.getGold() >= 20) {
                 player.addGold(-20);
                 System.out.println("You place 20 gold on the scale. It balances perfectly! The path is safe.");
@@ -484,7 +528,7 @@ class PuzzleManager {
                 room.setEnemy(Bestiary.goblin());
                 room.setPuzzleSolved(true); 
             }
-        } else if (answer.equals("2")) {
+        } else if (answer.equals("Offer an item from your inventory")) {
             if (player.getInventory().isEmpty()) {
                 System.out.println("You have no items to offer! The scales tip violently, triggering a trap door!");
                 room.setEnemy(Bestiary.goblin());
@@ -492,6 +536,7 @@ class PuzzleManager {
             } else {
                 boolean itemAccepted = false;
                 while (!itemAccepted) {
+                    // Standard numerical inventory list, not shuffled!
                     System.out.println("\nChoose an item to offer:");
                     for (int i = 0; i < player.getInventory().size(); i++) {
                         System.out.println((i + 1) + ". " + player.getInventory().get(i).getName());
@@ -540,51 +585,57 @@ class PuzzleManager {
 
     public void handleBrokenForkPuzzle(Room room, Player player) {
         System.out.println("\nThe cracked masonry features three stone bricks that can be pushed in.");
-        System.out.print("1. Push the left brick\n2. Push the center brick\n3. Push the right brick\nChoose: ");
-        if (DarkHolds.input.nextLine().trim().equals("2")) {
+        String answer = getShuffledChoice("Push the left brick", "Push the center brick", "Push the right brick");
+        if (answer.equals("Push the center brick")) {
             System.out.println("A heavy stone slides away, solving the puzzle!");
             room.setPuzzleSolved(true);
         } else {
+            int damage = random.nextInt(3) + 3; // 3 to 5
             System.out.println("A hidden dart shoots from the wall!");
-            player.takeDamage(5);
-            System.out.println("You take 5 damage and step back.");
+            player.takeDamage(damage);
+            System.out.println("You take " + damage + " damage and step back.");
         }
     }
 
     public void handleShrinePuzzle(Room room, Player player) {
         System.out.println("\nThe riddle on the altar reads: 'I speak without a mouth and hear without ears. I have nobody, but I come alive with wind. What am I?'");
-        System.out.print("1. A ghost\n2. An echo\n3. A snake\nChoose: ");
-        if (DarkHolds.input.nextLine().trim().equals("2")) {
+        String answer = getShuffledChoice("A ghost", "An echo", "A snake");
+        if (answer.equals("An echo")) {
             System.out.println("The shrine hums in approval. The puzzle is solved!");
             room.setPuzzleSolved(true);
         } else {
+            int damage = random.nextInt(2) + 4; // 4 to 5
             System.out.println("A hidden mechanism strikes you!");
-            player.takeDamage(5);
-            System.out.println("You take 5 damage and the riddle resets.");
+            player.takeDamage(damage);
+            System.out.println("You take " + damage + " damage and the riddle resets.");
         }
     }
     
     public void handleTotemPuzzle(Room room, Player player) {
-        System.out.print("\n1. Feed the Wolf\n2. Feed the Bat\n3. Feed the Snake\nChoose: ");
-        if (DarkHolds.input.nextLine().trim().equals("2")) {
+        System.out.println();
+        String answer = getShuffledChoice("Feed the Wolf", "Feed the Bat", "Feed the Snake");
+        if (answer.equals("Feed the Bat")) {
             System.out.println("The portcullis grinds open, solving the puzzle.");
             room.setPuzzleSolved(true);
         } else {
+            int damage = random.nextInt(3) + 6; // 6 to 8
             System.out.println("A hidden spring trap shoots a rusty spear!");
-            player.takeDamage(8);
-            System.out.println("You take 8 damage.");
+            player.takeDamage(damage);
+            System.out.println("You take " + damage + " damage.");
         }
     }
     
-    public void handleWeepingStatue(Room room, Player player, Random random) {
-        System.out.print("\n1. Drink the water\n2. Ignore it\nChoose: ");
-        if (DarkHolds.input.nextLine().trim().equals("1")) {
-            if (random.nextBoolean()) {
+    public void handleWeepingStatue(Room room, Player player, Random rand) {
+        System.out.println();
+        String answer = getShuffledChoice("Drink the water", "Ignore it");
+        if (answer.equals("Drink the water")) {
+            if (rand.nextBoolean()) {
                 player.increaseBaseAttack(2);
                 System.out.println("The oily water burns your throat, but you feel a surge of power! Attack permanently increased by 2.");
             } else {
-                player.takeDamage(5);
-                System.out.println("The oily water is foul! You take 5 damage.");
+                int damage = rand.nextInt(5) + 1; // 1 to 5
+                player.takeDamage(damage);
+                System.out.println("The oily water is foul! You take " + damage + " damage.");
             }
             room.setPuzzleSolved(true);
         } else {
@@ -594,8 +645,9 @@ class PuzzleManager {
     }
 
     public void handleCampsite(Room room, Player player) {
-        System.out.print("\n1. Rest by the cold firepit\n2. Keep moving\nChoose: ");
-        if (DarkHolds.input.nextLine().trim().equals("1")) {
+        System.out.println();
+        String answer = getShuffledChoice("Rest by the cold firepit", "Keep moving");
+        if (answer.equals("Rest by the cold firepit")) {
             System.out.println("You lay out the dusty bedroll and rest for a while, regaining 20 HP.");
             player.heal(20);
         } else {
@@ -604,13 +656,14 @@ class PuzzleManager {
         room.setPuzzleSolved(true);
     }
 
-    public void handleWishWell(Room room, Player player, Random random) {
-        System.out.print("\n1. Toss in 5 gold\n2. Leave it alone\nChoose: ");
-        if (DarkHolds.input.nextLine().trim().equals("1")) {
+    public void handleWishWell(Room room, Player player, Random rand) {
+        System.out.println();
+        String answer = getShuffledChoice("Toss in 5 gold", "Leave it alone");
+        if (answer.equals("Toss in 5 gold")) {
             if (player.getGold() >= 5) {
                 player.addGold(-5);
                 System.out.println("You toss 5 gold into the dark well. It vanishes into the depths...");
-                if (random.nextBoolean()) {
+                if (rand.nextBoolean()) {
                     System.out.println("A small vial inexplicably floats to the surface! You found a Small Potion.");
                     player.addItem(Items.smallPotion());
                 } else {
@@ -627,8 +680,9 @@ class PuzzleManager {
     }
 
     public void handleObsidianObelisk(Room room, Player player) {
-        System.out.print("\n1. Touch the humming obelisk\n2. Leave it alone\nChoose: ");
-        if (DarkHolds.input.nextLine().trim().equals("1")) {
+        System.out.println();
+        String answer = getShuffledChoice("Touch the humming obelisk", "Leave it alone");
+        if (answer.equals("Touch the humming obelisk")) {
             System.out.println("As you lay your hand on the smooth, black stone, a vial materializes at its base!\nYou received a Small Potion.");
             player.addItem(Items.smallPotion());
         } else {
@@ -637,14 +691,22 @@ class PuzzleManager {
         room.setPuzzleSolved(true);
     }
 
-    public void handleSilentLibrary(Room room, Player player, Random random) {
-        System.out.print("\n1. Search the rotting shelves\n2. Walk past them\nChoose: ");
-        if (DarkHolds.input.nextLine().trim().equals("1")) {
-            int randomOutcome = random.nextInt(3);
-            if (randomOutcome == 0) {
+    public void handleSilentLibrary(Room room, Player player, Random rand) {
+        System.out.println();
+        String answer = getShuffledChoice("Search the rotting shelves", "Walk past them");
+        if (answer.equals("Search the rotting shelves")) {
+            int randomOutcome = rand.nextInt(5);
+            if (randomOutcome < 3) {
                 System.out.println("You brush away the thick dust and find an intact magical scroll!");
-                player.addItem(Items.scrollOfFireball());
-            } else if (randomOutcome == 1) {
+                int scrollType = rand.nextInt(3);
+                if (scrollType == 0) {
+                    player.addItem(Items.scrollOfFireball());
+                } else if (scrollType == 1) {
+                    player.addItem(Items.scrollOfLifeSteal());
+                } else {
+                    player.addItem(Items.scrollOfLevelUp());
+                }
+            } else if (randomOutcome == 3) {
                 System.out.println("Reading the books you were able to determine that a necromancer is guarding the exit here.");
             } else {
                 System.out.println("Even after reading the books you were unable to determine what they meant.");
@@ -656,41 +718,51 @@ class PuzzleManager {
     }
 
     public void handleColorPillars(Room room, Player player) {
-        System.out.print("\n1. Touch the Red pillar\n2. Touch the Blue pillar\n3. Touch the Yellow pillar\nChoose: ");
-        if (DarkHolds.input.nextLine().trim().equals("1")) {
+        System.out.println();
+        String answer = getShuffledChoice("Touch the Red pillar", "Touch the Blue pillar", "Touch the Yellow pillar");
+        if (answer.equals("Touch the Red pillar")) {
             System.out.println("The red pillar sinks into the floor, and the door clicks open. The path is clear!");
             room.setPuzzleSolved(true);
         } else {
+            int damage = random.nextInt(3) + 5; // 5 to 7
             System.out.println("Incorrect! A hidden dart shoots out from the wall!");
-            player.takeDamage(5);
-            System.out.println("You take 5 damage.");
+            player.takeDamage(damage);
+            System.out.println("You take " + damage + " damage.");
         }
     }
 
     public void handleHourglassPuzzle(Room room, Player player) {
-        System.out.print("\n1. Pull the lever and try to escape!\n2. Do nothing and wait it out.\nChoose: ");
-        if (DarkHolds.input.nextLine().trim().equals("2")) {
+        System.out.println();
+        String answer = getShuffledChoice("Pull the lever and try to escape!", "Do nothing and wait it out.");
+        if (answer.equals("Do nothing and wait it out.")) {
             System.out.println("You remain calm. The sand reaches your waist, then suddenly drains away. The door unlocks!");
         } else {
+            int damage = random.nextInt(4) + 10; // 10 to 13
             System.out.println("Panicking, you pull the lever! A trapdoor opens above, dropping heavy rocks on you!");
-            player.takeDamage(10);
-            System.out.println("You take 10 damage before the door finally opens.");
+            player.takeDamage(damage);
+            System.out.println("You take " + damage + " damage before the door finally opens.");
         }
         room.setPuzzleSolved(true);
     }
 
-    public void handleLucksChance(Room room, Player player, Random random) {
-        System.out.print("\n1. Open Chest 1\n2. Open Chest 2\n3. Open Chest 3\nChoose: ");
-        DarkHolds.input.nextLine().trim(); 
-        int choice = random.nextInt(3); 
-        if (choice == 0) {
+    public void handleLucksChance(Room room, Player player, Random rand) {
+        System.out.println();
+        String answer = getShuffledChoice("Open Chest 1", "Open Chest 2", "Open Chest 3");
+        if (answer.isEmpty()) {
+            System.out.println("You hesitate. The chests magically seal themselves.");
+            room.setPuzzleSolved(true);
+            return;
+        }
+        
+        int outcome = rand.nextInt(3); 
+        if (outcome == 0) {
             System.out.println("The chest suddenly unhinges its jaw! It's a Mimic!");
             room.setEnemy(Bestiary.mimic());
             
             // The Mimic drops a high-tier item upon defeat
             List<Item> highTier = List.of(Items.bigPotion(), Items.greatSword(), Items.armor(), Items.scrollOfFireball());
-            room.addRewardItem(highTier.get(random.nextInt(highTier.size())));
-        } else if (choice == 1) {
+            room.addRewardItem(highTier.get(rand.nextInt(highTier.size())));
+        } else if (outcome == 1) {
             System.out.println("You found 30 gold inside!");
             player.addGold(30);
         } else {
@@ -700,18 +772,19 @@ class PuzzleManager {
         room.setPuzzleSolved(true);
     }
 
-    public void handleLakeOfTruth(Room room, Player player, Random random) {
-        System.out.print("\n1. Take the Silver Dagger\n2. Take the Gold Dagger\n3. Decline both\nChoose: ");
-        String answer = DarkHolds.input.nextLine().trim();
-        if (answer.equals("1")) {
-            int damage = random.nextInt(7) + 1;
+    public void handleLakeOfTruth(Room room, Player player, Random rand) {
+        System.out.println();
+        String answer = getShuffledChoice("Take the Silver Dagger", "Take the Gold Dagger", "Decline both");
+        
+        if (answer.equals("Take the Silver Dagger")) {
+            int damage = rand.nextInt(7) + 1;
             System.out.println("As you grab the Silver Dagger, it burns with freezing cold and shatters! You take " + damage + " damage.");
             player.takeDamage(damage);
-        } else if (answer.equals("2")) {
-            int damage = random.nextInt(6) + 4;
+        } else if (answer.equals("Take the Gold Dagger")) {
+            int damage = rand.nextInt(6) + 4;
             System.out.println("As you grab the Gold Dagger, it sears your flesh and melts away! You take " + damage + " damage.");
             player.takeDamage(damage);
-        } else if (answer.equals("3")) {
+        } else if (answer.equals("Decline both")) {
             System.out.println("You decline both daggers. The pool glows warmly, and you feel a surge of inner strength!");
             player.increaseBaseAttack(2);
             System.out.println("Your base strength permanently increases by 2.");
@@ -722,8 +795,9 @@ class PuzzleManager {
     }
 
     public void handleStarMapRoom(Room room, Player player) {
-        System.out.print("\n1. Wait and observe the stars\n2. Move on\nChoose: ");
-        if (DarkHolds.input.nextLine().trim().equals("1")) {
+        System.out.println();
+        String answer = getShuffledChoice("Wait and observe the stars", "Move on");
+        if (answer.equals("Wait and observe the stars")) {
             System.out.println("You sit quietly and study the alien constellations above.\nA strange, cosmic insight fills your mind, permanently increasing your attack by 1!");
             player.increaseBaseAttack(1);
         } else {
@@ -733,8 +807,9 @@ class PuzzleManager {
     }
 
     public void handleCrimsonAltar(Room room, Player player) {
-        System.out.print("\n1. Sacrifice your blood (lose 12 HP)\n2. Walk away\nChoose: ");
-        if (DarkHolds.input.nextLine().trim().equals("1")) {
+        System.out.println();
+        String answer = getShuffledChoice("Sacrifice your blood (lose 12 HP)", "Walk away");
+        if (answer.equals("Sacrifice your blood (lose 12 HP)")) {
             System.out.println("You cut your palm and let your blood drip onto the pristine marble.");
             player.takeDamage(12);
             System.out.println("You lose 12 HP, but feel a dark power surge through your veins! Attack increased by 3.");
@@ -745,15 +820,16 @@ class PuzzleManager {
         room.setPuzzleSolved(true);
     }
 
-    public void handleAbandonedLab(Room room, Player player, Random random) {
-        System.out.print("\n1. Drink the bubbling pink liquid\n2. Leave it alone\nChoose: ");
-        if (DarkHolds.input.nextLine().trim().equals("1")) {
-            if (random.nextBoolean()) {
-                int healAmount = 7 + random.nextInt(6);
+    public void handleAbandonedLab(Room room, Player player, Random rand) {
+        System.out.println();
+        String answer = getShuffledChoice("Drink the bubbling pink liquid", "Leave it alone");
+        if (answer.equals("Drink the bubbling pink liquid")) {
+            if (rand.nextBoolean()) {
+                int healAmount = 7 + rand.nextInt(6);
                 System.out.println("The liquid is sweet and invigorating! You regain " + healAmount + " HP.");
                 player.heal(healAmount);
             } else {
-                int damageAmount = 5 + random.nextInt(5);
+                int damageAmount = 5 + rand.nextInt(5);
                 System.out.println("The liquid burns your throat! It's poison! You take " + damageAmount + " damage.");
                 player.takeDamage(damageAmount);
             }
@@ -1166,38 +1242,55 @@ class WorldBuilder {
         int numRooms = random.nextInt(7) + 7; 
 
         Room safeRoom = new Room("f1safe", "Safe Room", "You wake in a cold stone chamber with only a rough stick beside you. A heavy locked hallway gate stands to one side, and the rest of the floor branches into darkness.", true, true);
+        safeRoom.setClearedDescription(safeRoom.getDisplayDescription()); // Keep original description
 
         List<Room> f1Pool = new ArrayList<>();
-        f1Pool.add(new Room("f1p_brokenFork", "Broken Fork", "The passage splits here around cracked masonry. An ancient puzzle locks the path.", true, true));
-        f1Pool.add(new Room("f1p_shrine", "Serpent Shrine", "A shrine of coiled stone and old offerings. A riddle is carved into the altar.", true, true));
-        f1Pool.add(new Room("f1p_weighingScales", "Room of Scales", "A massive bronze scale dominates the center of the room. One side is weighed down by a stone heart; the other side sits empty, waiting for an offering.", true, true));
+        
+        Room brokenFork = new Room("f1p_brokenFork", "Broken Fork", "The passage splits here around cracked masonry. An ancient puzzle locks the path.", true, true);
+        brokenFork.setClearedDescription("The cracked masonry has been shifted, solving the puzzle.");
+        f1Pool.add(brokenFork);
+        
+        Room shrine = new Room("f1p_shrine", "Serpent Shrine", "A shrine of coiled stone and old offerings. A riddle is carved into the altar.", true, true);
+        shrine.setClearedDescription("The serpent shrine is silent, its riddle answered.");
+        f1Pool.add(shrine);
+        
+        Room scales = new Room("f1p_weighingScales", "Room of Scales", "A massive bronze scale dominates the center of the room. One side is weighed down by a stone heart; the other side sits empty, waiting for an offering.", true, true);
+        scales.setClearedDescription("The bronze scale rests perfectly balanced, allowing safe passage.");
+        f1Pool.add(scales);
         
         Room batRoom = new Room("f1f_batRoost", "Bat Roost", "The ceiling above is black with restless shapes. Thin squeaks echo between the stones.", true, true);
         batRoom.setEnemy(Bestiary.bat());
+        batRoom.setClearedDescription("The roost is quiet now, the aggressive bats defeated.");
         f1Pool.add(batRoom);
 
-        Room goblinRoom = new Room("f1f_goblinOne", "Goblin Trail", "The smell of rot and old smoke thickens. You spot a goblin scavenger lurking among pilfered junk.", true, true);
+        Room goblinRoom = new Room("f1f_goblinOne", "Goblin Trail", "The smell of rot and old smoke thickens. You spot a goblin scavenger lurking among pilfered items.", true, true);
         goblinRoom.setEnemy(Bestiary.goblin());
+        goblinRoom.setClearedDescription("The goblin's corpse lies among the pilfered items.");
         f1Pool.add(goblinRoom);
 
         Room slimeRoom = new Room("f1f_slimeRoom", "Damp Tunnel", "A wet side cut opens into a slick pocket where something gelatinous shivers in the dark.", true, true);
         slimeRoom.setEnemy(Bestiary.slime());
+        slimeRoom.setClearedDescription("Only a puddle of inert ooze remains where the slime once shivered.");
         f1Pool.add(slimeRoom);
         
         Room chimneyShaft = new Room("f1f_chimneyShaft", "Crumbling Chimney", "A vertical shaft lets in a sliver of moonlight. A swarm of bats uses this as a highway to the surface.", true, true);
         chimneyShaft.setEnemy(Bestiary.bat());
+        chimneyShaft.setClearedDescription("The shaft is peaceful, the bat swarm having dispersed.");
         f1Pool.add(chimneyShaft);
 
         Room batRoots = new Room("f1f_bat_roots", "Hanging Roots", "Thick, dead tree roots punch through the ceiling here. Dozens of sleeping bats cling to them.", true, true);
         batRoots.setEnemy(Bestiary.bat());
+        batRoots.setClearedDescription("The dead tree roots hang empty; the bats have been slain.");
         f1Pool.add(batRoots);
 
         Room wolfDen = new Room("f1f_wolf_den", "Beast's Den", "The floor is covered in matted fur. A massive wolf blocks the exit, growling.", true, true);
         wolfDen.setEnemy(Bestiary.wolf());
+        wolfDen.setClearedDescription("The massive wolf lies still on the matted fur.");
         f1Pool.add(wolfDen);
 
         Room wolfTunnel = new Room("f1f_wolf_tunnel", "Howling Tunnel", "A real howl answers the draft as a wolf lunges from the shadows.", true, true);
         wolfTunnel.setEnemy(Bestiary.wolf());
+        wolfTunnel.setClearedDescription("The draft howls through the tunnel, but the beast is no more.");
         f1Pool.add(wolfTunnel);
 
         f1Pool.add(new Room("f1_cache", "Empty Cache", "A looted side chamber lies here with only scattered coins left behind.", true, true));
@@ -1209,13 +1302,15 @@ class WorldBuilder {
         f1Rooms.addAll(f1Pool.subList(0, numRooms - 4)); 
 
         Room lockedHall = new Room("f1lockedHall", "Locked Hallway", "With the key in hand, you force the rusted mechanism open.", false, false);
+        lockedHall.setClearedDescription(lockedHall.getDisplayDescription()); // Keep original description
         f1Rooms.add(lockedHall);
 
         Room f1Boss = new Room("f1snakeBoss", "Serpent Lair", "A giant snake rises from the treasure mound, its eyes fixed on you.", false, false);
         f1Boss.setEnemy(Bestiary.giantSnake());
+        f1Boss.setClearedDescription("The giant snake's massive lifeless coils rest upon the plundered hoard.");
         f1Rooms.add(f1Boss);
 
-        Room stairs1 = new Room("f1_stairs", "Stairs to Floor 2", "A spiral stone staircase leading down into the darkness.", false, false);
+        Room stairs1 = new Room("f1_stairs", "Stairs to Floor 2", "A spiral stone staircase ascending into the darkness.", false, false);
         f1Rooms.add(stairs1);
 
         for (int i = 0; i < f1Rooms.size() - 2; i++) connect(f1Rooms.get(i), f1Rooms.get(i + 1));
@@ -1229,51 +1324,76 @@ class WorldBuilder {
         int numRooms = random.nextInt(8) + 8; 
 
         List<Room> f2Pool = new ArrayList<>();
-        f2Pool.add(new Room("f2p_totem", "Totem of Gruum", "A crude wooden totem pole stands before a locked portcullis.", false, false));
-        f2Pool.add(new Room("f2p_weepingstatue", "Weeping Statue", "A towering marble statue of a hooded figure weeps oily water.", false, false));
-        f2Pool.add(new Room("f2p_campsite", "Abandoned Campsite", "A dusty bedroll and a cold firepit sit in the corner.", false, false));
-        f2Pool.add(new Room("f2p_wishwell", "The Wishing Well", "A deep stone well sits in the center of the room.", false, false));
-        f2Pool.add(new Room("f2p_obsidian_obelisk", "Obsidian Obelisk", "A perfectly smooth, black stone spire stands in the center.", false, false));
+        
+        Room totem = new Room("f2p_totem", "Totem of Gruum", "A crude wooden totem pole stands before a locked portcullis.", false, false);
+        totem.setClearedDescription("The wooden totem stands silently; the portcullis remains open.");
+        f2Pool.add(totem);
+        
+        Room statue = new Room("f2p_weepingstatue", "Weeping Statue", "A towering marble statue of a hooded figure weeps oily water.", false, false);
+        statue.setClearedDescription("The marble statue continues to weep, but you have already interacted with its waters.");
+        f2Pool.add(statue);
+        
+        Room campsite = new Room("f2p_campsite", "Abandoned Campsite", "A dusty bedroll and a cold firepit sit in the corner.", false, false);
+        campsite.setClearedDescription("The campsite is abandoned once more, the firepit cold.");
+        f2Pool.add(campsite);
+        
+        Room wishwell = new Room("f2p_wishwell", "The Wishing Well", "A deep stone well sits in the center of the room.", false, false);
+        wishwell.setClearedDescription("The dark well sits quietly, its depths keeping their secrets.");
+        f2Pool.add(wishwell);
+        
+        Room obelisk = new Room("f2p_obsidian_obelisk", "Obsidian Obelisk", "A perfectly smooth, black stone spire stands in the center.", false, false);
+        obelisk.setClearedDescription("The black stone spire continues to hum faintly, its gift already given.");
+        f2Pool.add(obelisk);
 
         Room altar = new Room("f2_shamansAltar", "The Shaman's Altar", "A makeshift altar of stacked stones is covered in melted wax.", false, false);
         altar.addRewardItem(Items.bigPotion());
         f2Pool.add(altar);
 
         Room armory = new Room("f2_desecratedArmory", "Desecrated Armory", "Shattered shields and bent swords litter the floor.", false, false);
-        if (random.nextBoolean()) armory.addRewardItem(Items.smallPotion());
+        int armoryLoot = random.nextInt(3);
+        if (armoryLoot == 0) armory.addRewardItem(Items.smallPotion());
+        else if (armoryLoot == 1) armory.addRewardItem(Items.decayedArmor());
         else armory.addGold(randomGold(7, 20, random));
         f2Pool.add(armory);
 
         Room slimePool = new Room("f2f_slime_pool", "Acidic Pool", "A bubbling puddle rises upward, forming into a massive blob.", false, false);
         slimePool.setEnemy(Bestiary.slime());
+        slimePool.setClearedDescription("The bubbling puddle has dissolved into harmless water.");
         f2Pool.add(slimePool);
 
         Room slimeCeiling = new Room("f2f_slime_ceiling", "The Dripping Ceiling", "The ceiling is coated in a vibrating slime that suddenly drops.", false, false);
         slimeCeiling.setEnemy(Bestiary.slime());
+        slimeCeiling.setClearedDescription("The ceiling still drips, but the slime has been defeated.");
         f2Pool.add(slimeCeiling);
 
         Room skelCrypt = new Room("f2f_skel_crypt", "Forgotten Crypt", "A skeleton steps out of a sarcophagus, raising a rusted sword.", false, false);
         skelCrypt.setEnemy(Bestiary.skeleton());
+        skelCrypt.setClearedDescription("The skeletal warrior is nothing more than scattered bones before its sarcophagus.");
         f2Pool.add(skelCrypt);
 
-        Room skelGrave = new Room("f2f_skel_grave", "The Mass Grave", "A skeletal hand bursts from the dirt, followed by the warrior.", false, false);
+        Room skelGrave = new Room("f2f_skel_grave", "The Mass Grave", "A skeletal hand burst from the dirt, followed by the warrior.", false, false);
         skelGrave.setEnemy(Bestiary.skeleton());
+        skelGrave.setClearedDescription("The dirt is disturbed where the skeleton emerged, but the undead is vanquished.");
         f2Pool.add(skelGrave);
 
         Room fightingPit = new Room("f2f_fighting_pit", "The Fighting Pit", "A battle-crazed Orc leaps down from the spectator ledge.", false, false);
         fightingPit.setEnemy(Bestiary.orc());
+        fightingPit.setClearedDescription("The Orc lies defeated in the bloodstained pit.");
         f2Pool.add(fightingPit);
 
         Room raidersBarricade = new Room("f2f_raiders_barricade", "Raider's Barricade", "A scarred Orc barks an alarm as you approach the chokepoint.", false, false);
         raidersBarricade.setEnemy(Bestiary.orc());
+        raidersBarricade.setClearedDescription("The barricade is clear, its Orcish defender slain.");
         f2Pool.add(raidersBarricade);
 
         Room alchemistSpill = new Room("f2f_alchemist_spill", "Alchemist's Spill", "Spilled alchemical reagents have coalesced into a bubbling Slime.", false, false);
         alchemistSpill.setEnemy(Bestiary.slime());
+        alchemistSpill.setClearedDescription("The alchemical slime has been neutralized, leaving only a stain.");
         f2Pool.add(alchemistSpill);
 
         Room spoilsRoom = new Room("f2f_spoils_room", "Spoils Room", "An Orc is busy biting coins to check their worth.", false, false);
         spoilsRoom.setEnemy(Bestiary.orc());
+        spoilsRoom.setClearedDescription("The Orc looter lies amidst the scattered coins.");
         f2Pool.add(spoilsRoom);
 
         // INJECT THE MERCHANT
@@ -1288,9 +1408,10 @@ class WorldBuilder {
 
         Room golemBoss = new Room("f2_golem_rune", "Runestone Chamber", "A Golem made entirely of carved runestones stands guard.", false, false);
         golemBoss.setEnemy(Bestiary.golem()); // THE GOLEM REPLACES BATS
+        golemBoss.setClearedDescription("The runestone Golem has crumbled into a heap of inert, carved rocks.");
         f2Rooms.add(golemBoss);
 
-        Room stairs2 = new Room("f2_stairs", "Stairs to Floor 3", "A deep, echoing stairwell descends further into the dark holds.", false, false);
+        Room stairs2 = new Room("f2_stairs", "Stairs to Floor 3", "A massive, spiraling iron staircase suspended by rusted chains over a seemingly bottomless abyss.", false, false);
         f2Rooms.add(stairs2);
 
         for (int i = 0; i < f2Rooms.size() - 2; i++) connect(f2Rooms.get(i), f2Rooms.get(i + 1));
@@ -1304,32 +1425,61 @@ class WorldBuilder {
         int numRooms = random.nextInt(9) + 9; 
         
         List<Room> f3Pool = new ArrayList<>();
-        f3Pool.add(new Room("f3p_silentlibrary", "Silent Library", "Rows of rotting bookshelves line this chamber.", false, false));
-        f3Pool.add(new Room("f3p_colorpillars", "Color Pillars", "Three pillars stand before a locked door. Red, blue, and yellow.", false, false));
-        f3Pool.add(new Room("f3p_hourglass", "Hourglass of Sand", "A giant hourglass flips when you enter.", false, false));
-        f3Pool.add(new Room("f3p_luckschance", "Luck's Chance", "You encounter a room with three chests.", false, false));
-        f3Pool.add(new Room("f3p_lakeoftruth", "Lake of Truth", "Two daggers rise from a pool. One silver, one gold.", false, false));
-        f3Pool.add(new Room("f3p_starmap_room", "Star Map Room", "The ceiling is painted with a glowing map of the night sky.", false, false));
-        f3Pool.add(new Room("f3p_crimson_altar", "The Crimson Altar", "A pristine white marble altar sits in the center.", false, false));
-        f3Pool.add(new Room("f3p_abandoned_lab", "Abandoned Laboratory", "A central cauldron bubbles with a sweet-smelling pink liquid.", false, false));
+        
+        Room silentLibrary = new Room("f3p_silentlibrary", "Silent Library", "Rows of rotting bookshelves line this chamber.", false, false);
+        silentLibrary.setClearedDescription("The rotting bookshelves collapse, leaving the library truly silent.");
+        f3Pool.add(silentLibrary);
+        
+        Room colorPillars = new Room("f3p_colorpillars", "Color Pillars", "Three pillars stand before a locked door. Red, blue, and yellow.", false, false);
+        colorPillars.setClearedDescription("The pillars have sunk into the floor, the mechanism permanently unlocked.");
+        f3Pool.add(colorPillars);
+        
+        Room hourglass = new Room("f3p_hourglass", "Hourglass of Sand", "A giant hourglass flips when you enter.", false, false);
+        hourglass.setClearedDescription("The giant hourglass is shattered and empty, the trial taken.");
+        f3Pool.add(hourglass);
+        
+        Room lucksChance = new Room("f3p_luckschance", "Luck's Chance", "You encounter a room with three chests.", false, false);
+        lucksChance.setClearedDescription("The chests remain open and empty, the gamble concluded.");
+        f3Pool.add(lucksChance);
+        
+        Room lakeOfTruth = new Room("f3p_lakeoftruth", "Lake of Truth", "Two daggers rise from a pool. One silver, one gold.", false, false);
+        lakeOfTruth.setClearedDescription("The pool glows warmly.");
+        f3Pool.add(lakeOfTruth);
+        
+        Room starMapRoom = new Room("f3p_starmap_room", "Star Map Room", "The ceiling is painted with a glowing map of the night sky.", false, false);
+        starMapRoom.setClearedDescription("The alien constellations glow steadily on the ceiling above.");
+        f3Pool.add(starMapRoom);
+        
+        Room crimsonAltar = new Room("f3p_crimson_altar", "The Crimson Altar", "A pristine white marble altar sits in the center.", false, false);
+        crimsonAltar.setClearedDescription("The pristine marble is stained, the altar's toll already paid.");
+        f3Pool.add(crimsonAltar);
+        
+        Room abandonedLab = new Room("f3p_abandoned_lab", "Abandoned Laboratory", "A central cauldron bubbles with a sweet-smelling pink liquid.", false, false);
+        abandonedLab.setClearedDescription("The cauldron's liquid has settled, no longer bubbling.");
+        f3Pool.add(abandonedLab);
+        
         f3Pool.add(new Room("f3_guardhouse", "Abandoned Guardhouse", "Weapon racks stand empty.", false, false));
         f3Pool.add(new Room("f3_statueGallery", "Statue Gallery", "A hall lined with statues of faceless knights.", false, false));
         f3Pool.add(new Room("f3_armorers_forge", "Armorer's Forge", "An unfinished breastplate rests on a table.", false, false));
 
         Room bonePit = new Room("f3f_bonePit", "The Bone Pit", "A hulking Ogre slowly turns towards you in a pit of bones.", false, false);
         bonePit.setEnemy(Bestiary.ogre()); 
+        bonePit.setClearedDescription("The hulking Ogre rests permanently among the bones of its victims.");
         f3Pool.add(bonePit);
 
         Room tremblingCavern = new Room("f3f_tremblingCavern", "The Trembling Cavern", "An Ogre wearing scavenged armor plates beats its chest and charges.", false, false);
         tremblingCavern.setEnemy(Bestiary.ogre());
+        tremblingCavern.setClearedDescription("The armored Ogre has fallen, leaving the cavern still.");
         f3Pool.add(tremblingCavern);
 
         Room trollsHoard = new Room("f3f_trollsHoard", "Troll's Hoard", "The Troll protecting a pile of shiny trash roars fiercely.", false, false);
         trollsHoard.setEnemy(Bestiary.caveTroll());
+        trollsHoard.setClearedDescription("The Cave Troll is dead, its shiny trash left unguarded.");
         f3Pool.add(trollsHoard);
 
         Room echoingChasm = new Room("f3f_echoingChasm", "Echoing Chasm", "A Cave Troll hangs from the stalactites above.", false, false);
         echoingChasm.setEnemy(Bestiary.caveTroll());
+        echoingChasm.setClearedDescription("The chasm echoes only with your footsteps; the Troll has been slain.");
         f3Pool.add(echoingChasm);
 
         Room cryptKings = new Room("f3_crypt_kings", "Crypt of the Forgotten Kings", "Ornate sarcophagi rest in alcoves.", false, false);
@@ -1355,15 +1505,18 @@ class WorldBuilder {
         Room dragonLair = new Room("f3_dragon_lair", "The Dragon's Lair", "A massive cavern scorched black by ancient fire.", false, false);
         dragonLair.setEnemy(Bestiary.dragon());
         dragonLair.addRewardItem(Items.dragonScale());
+        dragonLair.addRewardItem(Items.dragonEgg()); // DRAGON EGG ADDED HERE
+        dragonLair.setClearedDescription("The massive cavern is scorched black, the mighty Dragon's corpse resting eternally in its center.");
         
         // Connect the Lair specifically to the Antechamber
         connect(antechamber, dragonLair);
 
         Room necroBoss = new Room("f3_necro_altar", "Profane Altar", "A Necromancer in tattered robes is chanting.", false, false);
         necroBoss.setEnemy(Bestiary.necromancer());
+        necroBoss.setClearedDescription("The Necromancer lies defeated, their dark chanting silenced forever.");
         f3Rooms.add(necroBoss);
 
-        Room f3End = new Room("f3_end", "The Final Descent", "You step past the profane altar, having conquered the prototype...", false, false);
+        Room f3End = new Room("f3_end", "The Final Descent", "", false, false);
         f3Rooms.add(f3End);
 
         // Connect the main linear path
