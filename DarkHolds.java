@@ -1,7 +1,7 @@
 import java.util.*;
 
 /**
- * Dark Holds - The Grand Monolith (TEN Pillars + New Bosses + Cat Easter Egg + Endings)
+ * Dark Holds - The Grand Monolith (TEN Pillars + New Bosses + Cat Easter Egg)
  * ----------------------------------------------
  * The Ten Pillars of the Crypt, bound into a single massive scroll.
  */
@@ -444,32 +444,15 @@ class Game {
     }
 
     private void victory() {
-        System.out.println("\n========================================");
-        System.out.println("FLOOR 3 CLEARED");
-        System.out.println("========================================");
-        
-        System.out.print("The Necromancer is defeated. There is an option to Grab the staff. Do you grab it? (Y/N): ");
-        String staffAns = DarkHolds.input.nextLine().trim().toUpperCase();
-        System.out.println();
-        
-        if (staffAns.equals("Y")) {
-            System.out.println("As the Necromancer falls, you pick up their staff. A cold, dark power surges through your veins. You do not leave the crypt. Instead, you sit upon the profane altar, gazing into the shadows, chanting, patiently awaiting the next foolish adventurer.");
-            System.out.println("\nThe Corrupted Successor");
-            System.out.println("Ending 2 of 4");
-        } else if (player.hasItem("Dragon Egg")) {
-            System.out.println("The egg hatches in your arms, and the baby dragon imprints on you. You leave the dungeon not as a wealthy adventurer, but as a very tired, highly protective single parent.");
-            System.out.println("\nThe Parent");
-            System.out.println("Ending 4 of 4");
-        } else if (player.hasItem("Cat")) {
-            System.out.println("You use your dungeon loot to buy a small, quiet cottage at the edge of the woods. You hang up your sword forever, spending your days napping by a warm hearth with your purring dungeon cat.");
-            System.out.println("\nThe Cozy Retirement");
-            System.out.println("Ending 3 of 4");
-        } else {
-            System.out.println("You have vanquished the Necromancer and cleared the third floor. The heavy crypt doors groan open, revealing the blinding light of the surface world. You step out, lungs filling with fresh air, leaving the dark holds behind you. You return to your village, sell your weapons, and buy a modest plot of land. You spend the rest of your days quietly growing produce, perfectly content to never see another goblin again.");
-            System.out.println("\nThe Farmer");
-            System.out.println("Ending 1 of 4");
+        System.out.println("\n========================================\nFLOOR 3 CLEARED\n========================================");
+        System.out.println("You have vanquished the Necromancer and cleared the third floor.");
+        System.out.println("The heavy crypt doors groan open, revealing the blinding light of the surface world.");
+        System.out.println("You step out, lungs filling with fresh air, leaving the dark holds behind you.");
+        System.out.println("You return to your village, sell your weapons, and buy a modest plot of land.");
+        System.out.println("You spend the rest of your days quietly growing produce, perfectly content to never see another goblin again.");
+        if (player.hasItem("Cat")) {
+            System.out.println("The Cat rubs against your leg, purring. It is happy to have escaped the dungeon as well!");
         }
-        
         running = false;
     }
 
