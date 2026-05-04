@@ -1,7 +1,7 @@
 import java.util.*;
 
 /**
- * Dark Holds - The Grand Monolith (TEN Pillars + New Bosses + Cat Easter Egg)
+ * Dark Holds - The Grand Monolith (TEN Pillars + New Bosses + Cat Easter Egg + Unified Endings + Layered Wards)
  * ----------------------------------------------
  * The Ten Pillars of the Crypt, bound into a single massive scroll.
  */
@@ -444,15 +444,32 @@ class Game {
     }
 
     private void victory() {
-        System.out.println("\n========================================\nFLOOR 3 CLEARED\n========================================");
-        System.out.println("You have vanquished the Necromancer and cleared the third floor.");
-        System.out.println("The heavy crypt doors groan open, revealing the blinding light of the surface world.");
-        System.out.println("You step out, lungs filling with fresh air, leaving the dark holds behind you.");
-        System.out.println("You return to your village, sell your weapons, and buy a modest plot of land.");
-        System.out.println("You spend the rest of your days quietly growing produce, perfectly content to never see another goblin again.");
-        if (player.hasItem("Cat")) {
-            System.out.println("The Cat rubs against your leg, purring. It is happy to have escaped the dungeon as well!");
+        System.out.println("\n========================================");
+        System.out.println("FLOOR 3 CLEARED");
+        System.out.println("========================================");
+        
+        System.out.print("The Necromancer is defeated. There is an option to Grab the staff. Do you grab it? (Y/N): ");
+        String staffAns = DarkHolds.input.nextLine().trim().toUpperCase();
+        System.out.println();
+        
+        if (staffAns.equals("Y")) {
+            System.out.println("As the Necromancer falls, you pick up their staff. A cold, dark power surges through your veins. You do not leave the crypt. Instead, you sit upon the profane altar, gazing into the shadows, chanting, patiently awaiting the next foolish adventurer.");
+            System.out.println("\nThe Corrupted Successor");
+            System.out.println("Ending 2 of 4");
+        } else if (player.hasItem("Dragon Egg")) {
+            System.out.println("The egg hatches in your arms, and the baby dragon imprints on you. You leave the dungeon not as a wealthy adventurer, but as a very tired, highly protective single parent.");
+            System.out.println("\nThe Parent");
+            System.out.println("Ending 4 of 4");
+        } else if (player.hasItem("Cat")) {
+            System.out.println("You use your dungeon loot to buy a small, quiet cottage at the edge of the woods. You hang up your sword forever, spending your days napping by a warm hearth with your purring dungeon cat.");
+            System.out.println("\nThe Cozy Retirement");
+            System.out.println("Ending 3 of 4");
+        } else {
+            System.out.println("You have vanquished the Necromancer and cleared the third floor. The heavy crypt doors groan open, revealing the blinding light of the surface world. You step out, lungs filling with fresh air, leaving the dark holds behind you. You return to your village, sell your weapons, and buy a modest plot of land. You spend the rest of your days quietly growing produce, perfectly content to never see another goblin again.");
+            System.out.println("\nThe Farmer");
+            System.out.println("Ending 1 of 4");
         }
+        
         running = false;
     }
 
@@ -1730,11 +1747,25 @@ final class Items {
     }
 
     public static int getPassiveDefenseBonus(Player player) {
-        int total = 0;
+        int highestArmor = 0;
+        int highestShield = 0;
+        
         for (Item item : player.getInventory()) {
-            if (item instanceof PassiveGearItem gear) total += gear.getPassiveDefenseBonus();
+            if (item instanceof PassiveGearItem gear) {
+                // The True Name of a Shield is revealed if it grants parry
+                if (gear.grantsParry()) { 
+                    if (gear.getPassiveDefenseBonus() > highestShield) {
+                        highestShield = gear.getPassiveDefenseBonus();
+                    }
+                } else { 
+                    // Otherwise, it is worn Armor
+                    if (gear.getPassiveDefenseBonus() > highestArmor) {
+                        highestArmor = gear.getPassiveDefenseBonus();
+                    }
+                }
+            }
         }
-        return total;
+        return highestArmor + highestShield;
     }
 
     public static boolean playerHasTorch(Player player) { return player.hasItem("Torch"); }
@@ -2183,53 +2214,60 @@ enum MoveEffect { NONE, POCKET_SAND, CONSTRICT, SELF_HEAL, SOUL_DRAIN }
    ========================================================================================= */
 
 class MerchantManager {
+    // The Merchant's memory of unique items sold
+    private final Set<String> depletedStock = new HashSet<>();
 
     public void handleMerchant(Player player, Room room) {
-            System.out.println("\n--- THE WANDERING BAZAAR ---");
-            ImageGallery.reveal("Goblin"); // <-- TENTH PILLAR HOOK
-            System.out.println("The Goblin grins, revealing a mouth of jagged, golden teeth.");
-            System.out.println("\"Ah, a traveler! I have many shiny things... Or perhaps you have shiny things for me?\"");
+        System.out.println("\n--- THE WANDERING BAZAAR ---");
+        ImageGallery.reveal("Goblin"); // <-- TENTH PILLAR HOOK
+        System.out.println("The Goblin grins, revealing a mouth of jagged, golden teeth.");
+        System.out.println("\"Ah, a traveler! I have many shiny things... Or perhaps you have shiny things for me?\"");
+        
+        while (true) {
+            System.out.println("\nGold: " + player.getGold());
+            System.out.println("1. Buy");
+            System.out.println("2. Sell");
+            System.out.println("0. Leave");
+            System.out.print("Choose: ");
+            String answer = DarkHolds.input.nextLine().trim();
             
-            while (true) {
-                System.out.println("\nGold: " + player.getGold());
-                System.out.println("1. Buy");
-                System.out.println("2. Sell");
-                System.out.println("0. Leave");
-                System.out.print("Choose: ");
-                String answer = DarkHolds.input.nextLine().trim();
-                
-                if (answer.equals("1")) {
-                    buyMenu(player, room);
-                } else if (answer.equals("2")) {
-                    sellMenu(player);
-                } else if (answer.equals("0")) {
-                    System.out.println("\"Safe travels in the dark, friend! Come back if you survive!\"");
-                    break;
-                } else {
-                    System.out.println("Invalid choice.");
-                }
+            if (answer.equals("1")) {
+                buyMenu(player, room);
+            } else if (answer.equals("2")) {
+                sellMenu(player);
+            } else if (answer.equals("0")) {
+                System.out.println("\"Safe travels in the dark, friend! Come back if you survive!\"");
+                break;
+            } else {
+                System.out.println("Invalid choice.");
             }
         }
+    }
     
     private void buyMenu(Player player, Room room) {
         boolean isFloor3 = room.getId().startsWith("f3");
-        List<GameItem> wares = new ArrayList<>();
-        List<Integer> prices = new ArrayList<>();
-        
-        wares.add((GameItem) Items.smallPotion()); prices.add(20);
-        wares.add((GameItem) Items.torch());       prices.add(15);
-        wares.add((GameItem) Items.sword());       prices.add(40);
-        wares.add((GameItem) Items.shield());      prices.add(50);
-        wares.add((GameItem) Items.scrollOfEscape()); prices.add(30);
-        
-        if (isFloor3) {
-            wares.add((GameItem) Items.bigPotion());   prices.add(50);
-            wares.add((GameItem) Items.greatSword());  prices.add(85);
-            wares.add((GameItem) Items.armor());       prices.add(100);
-            wares.add((GameItem) Items.scrollOfFireball()); prices.add(60);
-        }
         
         while (true) {
+            // We summon the wares anew each loop so depleted items vanish
+            List<GameItem> wares = new ArrayList<>();
+            List<Integer> prices = new ArrayList<>();
+            
+            // Consumables and magic are infinite
+            wares.add((GameItem) Items.smallPotion()); prices.add(20);
+            wares.add((GameItem) Items.torch());       prices.add(15);
+            wares.add((GameItem) Items.scrollOfEscape()); prices.add(30);
+            
+            // Steel and wood are finite
+            if (!depletedStock.contains("Sword")) { wares.add((GameItem) Items.sword()); prices.add(40); }
+            if (!depletedStock.contains("Shield")) { wares.add((GameItem) Items.shield()); prices.add(50); }
+            
+            if (isFloor3) {
+                wares.add((GameItem) Items.bigPotion());   prices.add(50);
+                wares.add((GameItem) Items.scrollOfFireball()); prices.add(60);
+                if (!depletedStock.contains("Great Sword")) { wares.add((GameItem) Items.greatSword()); prices.add(85); }
+                if (!depletedStock.contains("Armor")) { wares.add((GameItem) Items.armor()); prices.add(100); }
+            }
+            
             System.out.println("\n--- BUY ---");
             System.out.println("Your Gold: " + player.getGold());
             for (int i = 0; i < wares.size(); i++) {
@@ -2245,9 +2283,15 @@ class MerchantManager {
                 if (choice >= 0 && choice < wares.size()) {
                     int cost = prices.get(choice);
                     if (player.getGold() >= cost) {
+                        GameItem boughtItem = wares.get(choice);
                         player.addGold(-cost);
-                        player.addItem(wares.get(choice));
-                        System.out.println("You bought the " + wares.get(choice).getName() + " for " + cost + " gold.");
+                        player.addItem(boughtItem);
+                        System.out.println("You bought the " + boughtItem.getName() + " for " + cost + " gold.");
+                        
+                        // If it is a unique relic (weapon or armor), the Goblin exhausts his supply
+                        if (boughtItem instanceof WeaponItem || boughtItem instanceof PassiveGearItem) {
+                            depletedStock.add(boughtItem.getName());
+                        }
                     } else {
                         System.out.println("\"You're too poor for that one!\"");
                     }
