@@ -8,7 +8,7 @@ public class DarkHolds {
 
     public static final Scanner input = new Scanner(System.in);
 
-    // PURPOSE: The primary summoning point of the application. Bootstraps the Game object.
+    // PURPOSE: The main entry point of the application. Bootstraps the Game object.
     public static void main(String[] args) {
         Game game = new Game();
         game.start();
@@ -51,7 +51,7 @@ class Game {
         gameLoop();
     }
 
-    // PURPOSE: Collects the player's True Name and establishes the narrative premise.
+    // PURPOSE: Collects the player's name and establishes the narrative premise.
     private void introStory() {
         System.out.println("========================================");
         System.out.println("           DARK HOLDS");
@@ -72,7 +72,7 @@ class Game {
         player = new Player(name);
     }
 
-    // PURPOSE: Bootstraps the crypt. Assembles rooms from the WorldBuilder and populates loot.
+    // PURPOSE: Initializes the game map. Assembles rooms from the WorldBuilder and populates loot.
     private void setupGame() {
         rooms = new LinkedHashMap<>();
         
@@ -142,7 +142,7 @@ class Game {
         }
     }
 
-    // PURPOSE: The eternal heartbeat of the application. Displays state, evaluates encounters, and waits for inputs.
+    // PURPOSE: The main execution loop of the game. Displays state, evaluates encounters, and waits for inputs.
     private void gameLoop() {
         while (running) {
             if (!player.isAlive()) {
@@ -243,7 +243,7 @@ class Game {
 
             revealRoomRewards(current);
 
-            // PROFESSOR REQUIREMENT: Win Condition check routed to victory()
+            // PURPOSE: Checks if the final room is reached, triggering the win condition.
             if (current.getId().equals("f3_end")) {
                 victory();
                 return;
@@ -358,7 +358,7 @@ class Game {
                 continue;
             }
 
-            // PROFESSOR REQUIREMENT: Exception Handling preventing crash on bad input.
+            // PURPOSE: Try-catch block ensures the program does not crash on invalid non-numeric input.
             try {
                 int choice = Integer.parseInt(answer);
                 if (choice < 1 || choice > neighborIds.size()) {
@@ -428,7 +428,7 @@ class Game {
             String answer = DarkHolds.input.nextLine().trim();
             if (answer.equals("0")) return;
 
-            // PROFESSOR REQUIREMENT: Exception handling for incorrect menu inputs.
+            // PURPOSE: Exception handling to catch invalid numeric inputs during inventory selection.
             try {
                 int index = Integer.parseInt(answer) - 1;
                 if (index < 0 || index >= player.getInventory().size()) {
@@ -453,8 +453,7 @@ class Game {
         }
     }
 
-    // PROFESSOR REQUIREMENT: Defined Win Condition.
-    // PURPOSE: Resolves the game state successfully and displays one of multiple possible endings based on items held.
+    // PURPOSE: Win condition resolution. Ends the game successfully and calculates the ending based on inventory.
     private void victory() {
         System.out.println("\n========================================");
         System.out.println("FLOOR 3 CLEARED");
@@ -485,8 +484,7 @@ class Game {
         running = false;
     }
 
-    // PROFESSOR REQUIREMENT: Defined Lose Condition.
-    // PURPOSE: Resolves the game state negatively upon player death.
+    // PURPOSE: Lose condition resolution. Ends the game when the player's health reaches zero.
     private void gameOver(String message) {
         System.out.println("\n========================================\nGAME OVER\n========================================");
         System.out.println(message);
@@ -1908,9 +1906,8 @@ class ItemContext {
     public void setEncounterBypassed(boolean encounterBypassed) { this.encounterBypassed = encounterBypassed; }
 }
 
-// PROFESSOR REQUIREMENT: Interface Implementation
 /**
- * Interface that formalizes the contract of usability.
+ * PURPOSE: Interface implementation that formalizes the contract of usability.
  * Separates the behavior of 'using' a thing from the 'physical matter' of an Item.
  */
 interface Usable {
@@ -2421,7 +2418,7 @@ class MerchantManager {
             String answer = DarkHolds.input.nextLine().trim();
             if (answer.equals("0")) break;
             
-            // PROFESSOR REQUIREMENT: Exception Handling preventing crash on bad merchant input.
+            // PURPOSE: Catches invalid numeric inputs to prevent crashing.
             try {
                 int choice = Integer.parseInt(answer) - 1;
                 if (choice >= 0 && choice < wares.size()) {
@@ -2471,7 +2468,7 @@ class MerchantManager {
             String answer = DarkHolds.input.nextLine().trim();
             if (answer.equals("0")) break;
             
-            // PROFESSOR REQUIREMENT: Exception Handling preventing crash on bad merchant input.
+            // PURPOSE: Catches invalid numeric inputs to prevent crashing.
             try {
                 int choice = Integer.parseInt(answer) - 1;
                 if (choice >= 0 && choice < player.getInventory().size()) {
@@ -2626,7 +2623,7 @@ class ImageGallery {
      -*=*%%  ##***+-+*@==%+=+    
      :++*=.  #%#+****##* .+-=    
     .+*=    .%@%%%%@@*=*-=*--:   
-   .+*+*-   =@@@%##%%++#*-+*** 
+   .+*+*-   =@@@%##%%++#*-+***
            .=%@@:    #%%         
         :+*##*###=--+%%%%+: 
 """);
@@ -2856,7 +2853,7 @@ O--====--++--
     -**%@%*%@@#*%.....@@@%####+=.       .+-##  
     :*@@@#**%@@.@#...@@@@%%####**=       .**%- 
     .-***+==--+#*++*+%@@@@@@@@%##%*:      :#%* 
-      +#%#****-*@@###=%*#=##*@@%*%**+=+*+=+*%@. 
+     +#%#****-*@@###=%*#=##*@@%*%**+=+*+=+*%@. 
      =*###***:*@@@%%@%%@%@@@@@@@%: :=**###%*.  
      +*#****+:#@%%@@@@@@@@@@@@@@@:      ..     
      =*###**+:%@%%%%%@@@%@@@@@@@@:
