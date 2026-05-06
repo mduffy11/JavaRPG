@@ -1,24 +1,30 @@
 import java.util.*;
 
 /**
- * Dark Holds - The Grand Monolith (TEN Pillars + New Bosses + Cat Easter Egg + Unified Endings + Layered Wards)
+ * Dark Holds - The Grand Design
  * ----------------------------------------------
- * The Ten Pillars of the Crypt, bound into a single massive scroll.
  */
 public class DarkHolds {
 
     public static final Scanner input = new Scanner(System.in);
 
+    // PURPOSE: The primary summoning point of the application. Bootstraps the Game object.
     public static void main(String[] args) {
         Game game = new Game();
         game.start();
     }
 }
 
+// [TAG: SECTION_1 ] - Core Game Loop & Flow
 /* =========================================================================================
-   PILLAR 1: THE CORE GRIMOIRE (Game Loop & Flow)
+   This section houses the central Game Engine. It manages the Player and World composition,
+   routing all player inputs to the appropriate managers.
    ========================================================================================= */
 
+/**
+ * The Game class is the master controller (GameEngine).
+ * It holds the core while-loop, managing the flow of time and routing state changes.
+ */
 class Game {
     private static final String FLOOR_ONE_IRON_KEY_ID = "locked_hall_iron_key";
 
@@ -30,6 +36,7 @@ class Game {
     private final MerchantManager merchantManager;
     private boolean running;
 
+    // PURPOSE: Initializes the subordinate managers that handle combat, puzzles, and trade.
     public Game() {
         this.random = new Random();
         this.battleManager = new BattleManager();
@@ -37,12 +44,14 @@ class Game {
         this.merchantManager = new MerchantManager();
     }
 
+    // PURPOSE: Begins the game's execution sequence.
     public void start() {
         introStory();
         setupGame();
         gameLoop();
     }
 
+    // PURPOSE: Collects the player's True Name and establishes the narrative premise.
     private void introStory() {
         System.out.println("========================================");
         System.out.println("           DARK HOLDS");
@@ -63,6 +72,7 @@ class Game {
         player = new Player(name);
     }
 
+    // PURPOSE: Bootstraps the crypt. Assembles rooms from the WorldBuilder and populates loot.
     private void setupGame() {
         rooms = new LinkedHashMap<>();
         
@@ -82,10 +92,8 @@ class Game {
 
         distributeGuaranteedLoot();
         
-        // --- INJECT THE RANDOM WANDERING CAT ---
         List<Room> possibleCatRooms = new ArrayList<>();
         for (Room r : rooms.values()) {
-            // The cat avoids Merchants and the Necromancer
             if (!r.isMerchantRoom() && !r.getId().equals("f3_necro_altar")) {
                 possibleCatRooms.add(r);
             }
@@ -100,6 +108,7 @@ class Game {
         running = true;
     }
 
+    // PURPOSE: Ensures vital items (keys, torches) are seeded into eligible rooms before play begins.
     private void distributeGuaranteedLoot() {
         List<Room> keyEligibleRooms = new ArrayList<>();
         List<Room> torchEligibleRooms = new ArrayList<>();
@@ -133,6 +142,7 @@ class Game {
         }
     }
 
+    // PURPOSE: The eternal heartbeat of the application. Displays state, evaluates encounters, and waits for inputs.
     private void gameLoop() {
         while (running) {
             if (!player.isAlive()) {
@@ -151,7 +161,6 @@ class Game {
             System.out.println(current.getName());
             System.out.println("========================================");
             
-            // DYNAMIC DRAGON ANTECHAMBER TEXT
             if (current.getId().equals("f3_dragon_antechamber")) {
                 if (player.hasItem("Ancient Relic")) {
                     System.out.println("A heavy stone door sits in the shadows. It is sealed tight, but in its center is an odd, jagged indentation that perfectly matches the Ancient Relic in your pack.");
@@ -168,7 +177,6 @@ class Game {
             
             showPlayerStatus();
 
-            // ONLY handle puzzles if the room is explicitly a puzzle room (f?p_ pattern)
             if (current.isPuzzleRoom() && !current.isPuzzleSolved() && !current.hasEnemy()) {
                 String id = current.getId();
                 if (id.equals("f1p_weighingScales")) puzzleManager.handleScalesPuzzle(current, player);
@@ -195,7 +203,7 @@ class Game {
                 boolean beginsBattle = promptBeforeBattle(current);
                 if (!beginsBattle) {
                     player.setCurrentRoom(player.getPreviousRoom());
-                    continue; // You ran away! The cat stays hidden.
+                    continue; 
                 }
 
                 BattleResult result = battleManager.handleBattle(player, current);
@@ -203,10 +211,9 @@ class Game {
                     gameOver("You died in battle against " + current.getEnemy().getName() + ".");
                     return;
                 }
-                if (result == BattleResult.ESCAPED) continue; // You fled the battle! The cat stays hidden.
+                if (result == BattleResult.ESCAPED) continue; 
             }
 
-            // CAT ENCOUNTER LOGIC (Triggered AFTER puzzles and battles)
             if (current.hasCat() && !current.isCatResolved()) {
                 System.out.println();
                 ImageGallery.reveal("Cat");
@@ -236,6 +243,7 @@ class Game {
 
             revealRoomRewards(current);
 
+            // PROFESSOR REQUIREMENT: Win Condition check routed to victory()
             if (current.getId().equals("f3_end")) {
                 victory();
                 return;
@@ -245,6 +253,7 @@ class Game {
         }
     }
 
+    // PURPOSE: Prints current health, stats, level, and gold to the console.
     private void showPlayerStatus() {
         System.out.println("\nPlayer: " + player.getName());
         System.out.println("HP: " + player.getHp() + "/" + player.getMaxHp());
@@ -263,6 +272,7 @@ class Game {
         System.out.println("Gold: " + player.getGold());
     }
 
+    // PURPOSE: Extracts items and gold from the room and adds them to the player's inventory.
     private void revealRoomRewards(Room room) {
         if (room.isRewardsCollected() || (room.hasEnemy() && !room.getEnemy().isDefeated()) || (room.isPuzzleRoom() && !room.isPuzzleSolved())) return;
 
@@ -293,6 +303,7 @@ class Game {
         if (foundSomething) room.setRewardsCollected(true);
     }
 
+    // PURPOSE: Pauses flow to ask the player if they wish to engage the room's enemy or flee.
     private boolean promptBeforeBattle(Room room) {
         while (true) {
             System.out.println();
@@ -310,6 +321,7 @@ class Game {
         }
     }
 
+    // PURPOSE: Manages movement between rooms.
     private void handleRoomChoices(Room current) {
         while (true) {
             System.out.println();
@@ -318,12 +330,10 @@ class Game {
                 Room nextRoom = rooms.get(neighborIds.get(i));
                 String text = "Go to " + nextRoom.getName();
 
-                // Locked Hall Check
                 if (current.getId().equals("f1safe") && nextRoom.getId().equals("f1lockedHall") && !player.hasKey(FLOOR_ONE_IRON_KEY_ID)) {
                     text = "Try the locked hallway (locked)";
                 }
                 
-                // Dragon Lair Check
                 if (current.getId().equals("f3_dragon_antechamber") && nextRoom.getId().equals("f3_dragon_lair")) {
                     text = player.hasItem("Ancient Relic") ? "Open the sealed stone door with the Relic" : "Try the sealed stone door (Locked)";
                 }
@@ -348,6 +358,7 @@ class Game {
                 continue;
             }
 
+            // PROFESSOR REQUIREMENT: Exception Handling preventing crash on bad input.
             try {
                 int choice = Integer.parseInt(answer);
                 if (choice < 1 || choice > neighborIds.size()) {
@@ -357,13 +368,11 @@ class Game {
 
                 Room nextRoom = rooms.get(neighborIds.get(choice - 1));
                 
-                // Locked door block
                 if (current.getId().equals("f1safe") && nextRoom.getId().equals("f1lockedHall") && !player.hasKey(FLOOR_ONE_IRON_KEY_ID)) {
                     System.out.println("The heavy hallway gate is locked. You need a key.");
                     continue;
                 }
                 
-                // Dragon door block
                 if (current.getId().equals("f3_dragon_antechamber") && nextRoom.getId().equals("f3_dragon_lair")) {
                     if (!player.hasItem("Ancient Relic")) {
                         System.out.println("The heavy stone door refuses to budge. It is magically sealed.");
@@ -390,19 +399,19 @@ class Game {
         }
     }
 
+    // PURPOSE: Ensures locked boss rooms block paths until cleared.
     private List<String> getVisibleNeighborIds(Room current) {
         List<String> visible = new ArrayList<>();
         for (String neighborId : current.getNeighborIds()) {
             if (current.getId().equals("f1snakeBoss") && (neighborId.equals("f1_snakeHoard") || neighborId.equals("f1_stairs") || neighborId.startsWith("f2")) && current.hasEnemy() && !current.getEnemy().isDefeated()) continue;
             if (current.getId().equals("f2_golem_rune") && (neighborId.equals("f2_stairs") || neighborId.startsWith("f3")) && current.hasEnemy() && !current.getEnemy().isDefeated()) continue;
             if (current.getId().equals("f3_necro_altar") && (neighborId.equals("f3_end")) && current.hasEnemy() && !current.getEnemy().isDefeated()) continue;
-            
-            // Dragon Lair is only visible from antechamber (already implicitly true by graph edges)
             visible.add(neighborId);
         }
         return visible;
     }
 
+    // PURPOSE: Displays held items and allows use of implements adhering to the Usable interface outside of combat.
     private void openInventoryMenu() {
         while (true) {
             System.out.println("\nINVENTORY");
@@ -419,6 +428,7 @@ class Game {
             String answer = DarkHolds.input.nextLine().trim();
             if (answer.equals("0")) return;
 
+            // PROFESSOR REQUIREMENT: Exception handling for incorrect menu inputs.
             try {
                 int index = Integer.parseInt(answer) - 1;
                 if (index < 0 || index >= player.getInventory().size()) {
@@ -443,6 +453,8 @@ class Game {
         }
     }
 
+    // PROFESSOR REQUIREMENT: Defined Win Condition.
+    // PURPOSE: Resolves the game state successfully and displays one of multiple possible endings based on items held.
     private void victory() {
         System.out.println("\n========================================");
         System.out.println("FLOOR 3 CLEARED");
@@ -473,28 +485,33 @@ class Game {
         running = false;
     }
 
+    // PROFESSOR REQUIREMENT: Defined Lose Condition.
+    // PURPOSE: Resolves the game state negatively upon player death.
     private void gameOver(String message) {
         System.out.println("\n========================================\nGAME OVER\n========================================");
         System.out.println(message);
         running = false;
     }
 
+    // PURPOSE: Utility method to fetch random integers.
     private int randomBetween(int min, int max) {
         return min + random.nextInt(max - min + 1);
     }
 }
 
+// [TAG: SECTION_2 ] - Master of Traps (PuzzleManager)
 /* =========================================================================================
-   PILLAR 2: THE MASTER OF TRAPS (PuzzleManager)
+   This class encapsulates all custom logic for puzzle rooms, separating complex 
+   if/else riddle chains from the main game loop to maintain clean architecture.
    ========================================================================================= */
 
+/**
+ * Handles all logic for non-combat interactive events (puzzles, shrines, traps).
+ */
 class PuzzleManager {
     private final Random random = new Random();
 
-    /**
-     * Helper to display a shuffled list of options to the user,
-     * ensuring they cannot just memorize the number choice.
-     */
+    // PURPOSE: Shuffles options so players cannot memorize numeric answers across playthroughs.
     private String getShuffledChoice(String... options) {
         List<String> list = Arrays.asList(options);
         Collections.shuffle(list, random);
@@ -509,11 +526,11 @@ class PuzzleManager {
                 return list.get(choice - 1);
             }
         } catch (NumberFormatException e) {
-            // Returns empty string below if parsing fails
         }
         return "";
     }
 
+    // PURPOSE: Floor 1 Puzzle - Scale balancing logic.
     public void handleScalesPuzzle(Room room, Player player) {
         System.out.println("\nThe scale waits for an offering to balance the path.");
         String answer = getShuffledChoice("Offer 20 gold", "Offer an item from your inventory", "Ignore it and try to walk past");
@@ -536,7 +553,6 @@ class PuzzleManager {
             } else {
                 boolean itemAccepted = false;
                 while (!itemAccepted) {
-                    // Standard numerical inventory list, not shuffled!
                     System.out.println("\nChoose an item to offer:");
                     for (int i = 0; i < player.getInventory().size(); i++) {
                         System.out.println((i + 1) + ". " + player.getInventory().get(i).getName());
@@ -583,6 +599,7 @@ class PuzzleManager {
         }
     }
 
+    // PURPOSE: Floor 1 Puzzle - Masonry brick logic.
     public void handleBrokenForkPuzzle(Room room, Player player) {
         System.out.println("\nThe cracked masonry features three stone bricks that can be pushed in.");
         String answer = getShuffledChoice("Push the left brick", "Push the center brick", "Push the right brick");
@@ -597,6 +614,7 @@ class PuzzleManager {
         }
     }
 
+    // PURPOSE: Floor 1 Puzzle - Text riddle.
     public void handleShrinePuzzle(Room room, Player player) {
         System.out.println("\nThe riddle on the altar reads: 'I speak without a mouth and hear without ears. I have nobody, but I come alive with wind. What am I?'");
         String answer = getShuffledChoice("A ghost", "An echo", "A snake");
@@ -611,6 +629,7 @@ class PuzzleManager {
         }
     }
     
+    // PURPOSE: Floor 2 Puzzle - Portcullis lock mechanism.
     public void handleTotemPuzzle(Room room, Player player) {
         System.out.println();
         String answer = getShuffledChoice("Feed the Wolf", "Feed the Bat", "Feed the Snake");
@@ -625,6 +644,7 @@ class PuzzleManager {
         }
     }
     
+    // PURPOSE: Floor 2 Puzzle - Random stat buff or damage.
     public void handleWeepingStatue(Room room, Player player, Random rand) {
         System.out.println();
         String answer = getShuffledChoice("Drink the water", "Ignore it");
@@ -644,6 +664,7 @@ class PuzzleManager {
         }
     }
 
+    // PURPOSE: Floor 2 Event - Free heal.
     public void handleCampsite(Room room, Player player) {
         System.out.println();
         String answer = getShuffledChoice("Rest by the cold firepit", "Keep moving");
@@ -656,6 +677,7 @@ class PuzzleManager {
         room.setPuzzleSolved(true);
     }
 
+    // PURPOSE: Floor 2 Event - Gamble gold for item.
     public void handleWishWell(Room room, Player player, Random rand) {
         System.out.println();
         String answer = getShuffledChoice("Toss in 5 gold", "Leave it alone");
@@ -679,6 +701,7 @@ class PuzzleManager {
         }
     }
 
+    // PURPOSE: Floor 2 Event - Free item.
     public void handleObsidianObelisk(Room room, Player player) {
         System.out.println();
         String answer = getShuffledChoice("Touch the humming obelisk", "Leave it alone");
@@ -691,6 +714,7 @@ class PuzzleManager {
         room.setPuzzleSolved(true);
     }
 
+    // PURPOSE: Floor 3 Puzzle - Loot generation.
     public void handleSilentLibrary(Room room, Player player, Random rand) {
         System.out.println();
         String answer = getShuffledChoice("Search the rotting shelves", "Walk past them");
@@ -717,6 +741,7 @@ class PuzzleManager {
         room.setPuzzleSolved(true);
     }
 
+    // PURPOSE: Floor 3 Puzzle - Deduction test.
     public void handleColorPillars(Room room, Player player) {
         System.out.println();
         String answer = getShuffledChoice("Touch the Red pillar", "Touch the Blue pillar", "Touch the Yellow pillar");
@@ -731,6 +756,7 @@ class PuzzleManager {
         }
     }
 
+    // PURPOSE: Floor 3 Puzzle - Patience test.
     public void handleHourglassPuzzle(Room room, Player player) {
         System.out.println();
         String answer = getShuffledChoice("Pull the lever and try to escape!", "Do nothing and wait it out.");
@@ -745,6 +771,7 @@ class PuzzleManager {
         room.setPuzzleSolved(true);
     }
 
+    // PURPOSE: Floor 3 Puzzle - Gambler's chest sequence.
     public void handleLucksChance(Room room, Player player, Random rand) {
         System.out.println();
         String answer = getShuffledChoice("Open Chest 1", "Open Chest 2", "Open Chest 3");
@@ -759,7 +786,6 @@ class PuzzleManager {
             System.out.println("The chest suddenly unhinges its jaw! It's a Mimic!");
             room.setEnemy(Bestiary.mimic());
             
-            // The Mimic drops a high-tier item upon defeat
             List<Item> highTier = List.of(Items.bigPotion(), Items.greatSword(), Items.armor(), Items.scrollOfFireball());
             room.addRewardItem(highTier.get(rand.nextInt(highTier.size())));
         } else if (outcome == 1) {
@@ -772,6 +798,7 @@ class PuzzleManager {
         room.setPuzzleSolved(true);
     }
 
+    // PURPOSE: Floor 3 Event - Stat buff vs damage gamble.
     public void handleLakeOfTruth(Room room, Player player, Random rand) {
         System.out.println();
         String answer = getShuffledChoice("Take the Silver Dagger", "Take the Gold Dagger", "Decline both");
@@ -794,6 +821,7 @@ class PuzzleManager {
         room.setPuzzleSolved(true);
     }
 
+    // PURPOSE: Floor 3 Event - Free stat buff.
     public void handleStarMapRoom(Room room, Player player) {
         System.out.println();
         String answer = getShuffledChoice("Wait and observe the stars", "Move on");
@@ -806,6 +834,7 @@ class PuzzleManager {
         room.setPuzzleSolved(true);
     }
 
+    // PURPOSE: Floor 3 Event - Blood sacrifice for stats.
     public void handleCrimsonAltar(Room room, Player player) {
         System.out.println();
         String answer = getShuffledChoice("Sacrifice your blood (lose 12 HP)", "Walk away");
@@ -820,6 +849,7 @@ class PuzzleManager {
         room.setPuzzleSolved(true);
     }
 
+    // PURPOSE: Floor 3 Event - Gamble potion.
     public void handleAbandonedLab(Room room, Player player, Random rand) {
         System.out.println();
         String answer = getShuffledChoice("Drink the bubbling pink liquid", "Leave it alone");
@@ -840,19 +870,26 @@ class PuzzleManager {
     }
 }
 
+// [TAG: SECTION_3 ] - Arena of Blood (BattleManager)
 /* =========================================================================================
-   PILLAR 3: THE ARENA OF BLOOD (BattleManager)
+   Decoupled combat logic. Calculates damage, handles turns, and resolves the use of 
+   potions, parrying, dodging, running, and special enemy attacks (constrict, sand).
    ========================================================================================= */
 
+/**
+ * Manages the turn-based combat system between the Player and an Enemy object.
+ */
 class BattleManager {
     private static final int RUN_SUCCESS_RATE = 80;
     private static final int CONSTRICT_DAMAGE = 2;
     private final Random random;
 
+    // PURPOSE: Instantiates the BattleManager and its RNG core.
     public BattleManager() {
         this.random = new Random();
     }
 
+    // PURPOSE: Drives the combat loop until either the Player or Enemy HP reaches 0, or the player escapes.
     public BattleResult handleBattle(Player player, Room room) {
         Enemy enemy = room.getEnemy();
         boolean sandInEyes = false;
@@ -987,6 +1024,7 @@ class BattleManager {
         return BattleResult.WON;
     }
 
+    // PURPOSE: Gathers numeric input from the player to determine their combat action.
     private PlayerAction promptPlayerAction(Player player) {
         while (true) {
             Map<String, PlayerAction> options = new LinkedHashMap<>();
@@ -1020,6 +1058,7 @@ class BattleManager {
         }
     }
 
+    // PURPOSE: Executes a low-accuracy, low-damage stick attack.
     private boolean playerBasicAttack(Player player, Enemy enemy, boolean sandInEyes) {
         WeaponItem stick = Items.findWeapon(player, "Stick");
         int accuracy = stick != null ? stick.getAccuracy() : 95;
@@ -1039,6 +1078,7 @@ class BattleManager {
         return false;
     }
 
+    // PURPOSE: Executes a standard sword attack.
     private boolean playerSwordAttack(Player player, Enemy enemy, boolean sandInEyes) {
         WeaponItem sword = Items.findWeapon(player, "Sword");
         int accuracy = sword != null ? sword.getAccuracy() : 90;
@@ -1058,6 +1098,7 @@ class BattleManager {
         return false;
     }
 
+    // PURPOSE: Executes a high-damage but level-dependent accuracy attack.
     private boolean playerGreatSwordAttack(Player player, Enemy enemy, boolean sandInEyes) {
         WeaponItem weapon = Items.findWeapon(player, "Great Sword");
         int accuracy = 60;
@@ -1081,6 +1122,7 @@ class BattleManager {
         return false;
     }
 
+    // PURPOSE: Executes a torch attack that deals elemental bonus damage to slime.
     private boolean playerTorchAttack(Player player, Enemy enemy, boolean sandInEyes) {
         WeaponItem torch = Items.findWeapon(player, "Torch");
         int accuracy = torch != null ? torch.getAccuracy() : 80;
@@ -1111,6 +1153,7 @@ class BattleManager {
         return false;
     }
 
+    // PURPOSE: Prompts the player to Dodge or Parry (if a shield is held).
     private BattleTurnResult openActionMenu(Player player) {
         while (true) {
             System.out.println("Action:\n1. Dodge");
@@ -1132,6 +1175,7 @@ class BattleManager {
         }
     }
 
+    // PURPOSE: Helper method to determine if any inventory item provides the parry skill.
     private boolean playerCanParry(Player player) {
         for (Item item : player.getInventory()) {
             if (item instanceof GameItem gameItem && gameItem.grantsParry()) return true;
@@ -1139,6 +1183,7 @@ class BattleManager {
         return false;
     }
 
+    // PURPOSE: Processes items chosen from the inventory during a combat encounter. Uses the Usable interface.
     private BattleTurnResult useItemInBattle(Player player, Enemy enemy, boolean sandInEyes) {
         while (true) {
             System.out.println("Inventory:");
@@ -1167,6 +1212,11 @@ class BattleManager {
                 if (item.getName().equalsIgnoreCase("Great Sword")) return new BattleTurnResult(true, playerGreatSwordAttack(player, enemy, sandInEyes), true, false, false, false);
                 if (item.getName().equalsIgnoreCase("Torch")) return new BattleTurnResult(true, playerTorchAttack(player, enemy, sandInEyes), true, false, false, false);
 
+                if (item instanceof GameItem gameItem && gameItem.grantsParry()) {
+                    System.out.println("You raise your " + item.getName() + ", bracing to parry the next physical attack!");
+                    return new BattleTurnResult(true, sandInEyes, false, false, false, true);
+                }
+
                 if (item instanceof GameItem gameItem && gameItem.canUseInBattle()) {
                     ItemContext context = new ItemContext();
                     context.setInBattle(true);
@@ -1185,6 +1235,7 @@ class BattleManager {
         }
     }
 
+    // PURPOSE: Executes probability logic to see if the player flees the current room.
     private boolean tryRun(Player player) {
         if (player.getCurrentRoom().equals(player.getPreviousRoom())) {
             System.out.println("The way behind you is blocked! You cannot escape!");
@@ -1199,10 +1250,12 @@ class BattleManager {
         return false;
     }
 
+    // PURPOSE: Calculates standard player attack damage against enemy defense.
     private int calculatePlayerDamage(int playerAttack, int movePower, int enemyDefense) {
         return Math.max(1, movePower + playerAttack - enemyDefense);
     }
 
+    // PURPOSE: Calculates standard enemy attack damage against player defense.
     private int calculateEnemyDamage(Enemy enemy, EnemyMove move, Player player) {
         if (move.getEffect() == MoveEffect.POCKET_SAND) return 1;
         return Math.max(1, move.getPower() + enemy.getAttack() - player.getDefense());
@@ -1210,9 +1263,11 @@ class BattleManager {
 }
 
 enum BattleResult { WON, ESCAPED, DIED }
-
 enum PlayerAction { ATTACK, SWORD, GREAT_SWORD, TORCH, ACTION, INVENTORY, RUN }
 
+/**
+ * Encapsulates the specific outcomes of a single combat turn.
+ */
 class BattleTurnResult {
     private final boolean turnConsumed, sandInEyes, consumeSandBlindness, dodgeActive, forcedEscape, parryActive;
     public BattleTurnResult(boolean turnConsumed, boolean sandInEyes, boolean consumeSandBlindness, boolean dodgeActive, boolean forcedEscape, boolean parryActive) {
@@ -1231,12 +1286,19 @@ class BattleTurnResult {
     public boolean isParryActive() { return parryActive; }
 }
 
+// [TAG: SECTION_4 ] - Architect's Blueprint (WorldBuilder)
 /* =========================================================================================
-   PILLAR 4: THE ARCHITECT'S BLUEPRINT (WorldBuilder)
+   Builds the map on startup. Provides procedural generation for replayability by 
+   randomly assembling rooms and injecting them into the World's map structure.
    ========================================================================================= */
 
+/**
+ * A static utility class responsible for generating the dungeon layout, seeding enemies,
+ * and linking room edges to construct the navigation graph.
+ */
 class WorldBuilder {
 
+    // PURPOSE: Assembles the rooms and events for the first floor.
     public static List<Room> createFloorOne(Random random) {
         List<Room> f1Rooms = new ArrayList<>();
         int numRooms = random.nextInt(7) + 7; 
@@ -1302,7 +1364,7 @@ class WorldBuilder {
         f1Rooms.addAll(f1Pool.subList(0, numRooms - 4)); 
 
         Room lockedHall = new Room("f1lockedHall", "Locked Hallway", "With the key in hand, you force the rusted mechanism open.", false, false);
-        lockedHall.setClearedDescription(lockedHall.getDisplayDescription()); // Keep original description
+        lockedHall.setClearedDescription(lockedHall.getDisplayDescription());
         f1Rooms.add(lockedHall);
 
         Room f1Boss = new Room("f1snakeBoss", "Serpent Lair", "A giant snake rises from the treasure mound, its eyes fixed on you.", false, false);
@@ -1319,6 +1381,7 @@ class WorldBuilder {
         return f1Rooms;
     }
 
+    // PURPOSE: Assembles the rooms and events for the second floor, including the wandering merchant.
     public static List<Room> createFloorTwo(Random random) {
         List<Room> f2Rooms = new ArrayList<>();
         int numRooms = random.nextInt(8) + 8; 
@@ -1396,7 +1459,6 @@ class WorldBuilder {
         spoilsRoom.setClearedDescription("The Orc looter lies amidst the scattered coins.");
         f2Pool.add(spoilsRoom);
 
-        // INJECT THE MERCHANT
         Room merchantRoom = new Room("f2_merchant", "Wandering Merchant's Camp", "A small fire crackles in the corner. A neutral Goblin sits on a heavily burdened mule pack, smoking a pipe.", false, false);
         merchantRoom.setMerchantRoom(true);
 
@@ -1407,7 +1469,7 @@ class WorldBuilder {
         f2Rooms.addAll(selectedF2);
 
         Room golemBoss = new Room("f2_golem_rune", "Runestone Chamber", "A Golem made entirely of carved runestones stands guard.", false, false);
-        golemBoss.setEnemy(Bestiary.golem()); // THE GOLEM REPLACES BATS
+        golemBoss.setEnemy(Bestiary.golem()); 
         golemBoss.setClearedDescription("The runestone Golem has crumbled into a heap of inert, carved rocks.");
         f2Rooms.add(golemBoss);
 
@@ -1420,6 +1482,7 @@ class WorldBuilder {
         return f2Rooms;
     }
 
+    // PURPOSE: Assembles the rooms and events for the final floor, appending the secret boss lair correctly.
     public static List<Room> createFloorThree(Random random) {
         List<Room> f3Rooms = new ArrayList<>();
         int numRooms = random.nextInt(9) + 9; 
@@ -1486,11 +1549,9 @@ class WorldBuilder {
         cryptKings.addGold(randomGold(15, 25, random));
         f3Pool.add(cryptKings);
 
-        // INJECT THE MERCHANT
         Room merchantRoom = new Room("f3_merchant", "Wandering Merchant's Camp", "The Goblin Merchant has set up his camp here. He recognizes you and nods, adjusting his wares.", false, false);
         merchantRoom.setMerchantRoom(true);
 
-        // THE DRAGON ANTECHAMBER (Added to general pool)
         Room antechamber = new Room("f3_dragon_antechamber", "The Whispering Antechamber", "The air here is unnaturally hot.", false, false);
         antechamber.addGold(randomGold(10, 30, random));
         f3Pool.add(antechamber);
@@ -1501,14 +1562,12 @@ class WorldBuilder {
         Collections.shuffle(selectedF3, random);
         f3Rooms.addAll(selectedF3);
 
-        // THE DRAGON LAIR
         Room dragonLair = new Room("f3_dragon_lair", "The Dragon's Lair", "A massive cavern scorched black by ancient fire.", false, false);
         dragonLair.setEnemy(Bestiary.dragon());
         dragonLair.addRewardItem(Items.dragonScale());
-        dragonLair.addRewardItem(Items.dragonEgg()); // DRAGON EGG ADDED HERE
+        dragonLair.addRewardItem(Items.dragonEgg()); 
         dragonLair.setClearedDescription("The massive cavern is scorched black, the mighty Dragon's corpse resting eternally in its center.");
         
-        // Connect the Lair specifically to the Antechamber
         connect(antechamber, dragonLair);
 
         Room necroBoss = new Room("f3_necro_altar", "Profane Altar", "A Necromancer in tattered robes is chanting.", false, false);
@@ -1519,30 +1578,36 @@ class WorldBuilder {
         Room f3End = new Room("f3_end", "The Final Descent", "", false, false);
         f3Rooms.add(f3End);
 
-        // Connect the main linear path
         for (int i = 0; i < f3Rooms.size() - 2; i++) connect(f3Rooms.get(i), f3Rooms.get(i + 1));
         f3Rooms.get(f3Rooms.size() - 2).addNeighbor(f3Rooms.get(f3Rooms.size() - 1).getId());
 
-        // Add the lair at the very end so it exists in the game map without breaking the linear progression
         f3Rooms.add(dragonLair);
 
         return f3Rooms;
     }
 
+    // PURPOSE: Utility to bidirectionally link two Room nodes.
     public static void connect(Room a, Room b) {
         a.addNeighbor(b.getId());
         b.addNeighbor(a.getId());
     }
     
+    // PURPOSE: Utility to generate a random gold amount for chest loot.
     private static int randomGold(int min, int max, Random random) {
         return min + random.nextInt(max - min + 1);
     }
 }
 
+// [TAG: SECTION_5 ] - Vessel of Flesh (Player State)
 /* =========================================================================================
-   PILLAR 5: THE VESSEL OF FLESH (Player State)
+   Holds the state data for the user. Manages inventory array, level progression,
+   and core stat scaling as the game loops.
    ========================================================================================= */
 
+/**
+ * The Player class represents the human-controlled entity.
+ * It tracks HP, stats, gold, level, and stores items via Aggregation.
+ */
 class Player {
     private static final int[] XP_THRESHOLDS = {0, 12, 26, 42, 60, 82, 108, 138, 172, 210, 252, 298, 348};
     private static final int[] HP_BY_LEVEL = {50, 54, 58, 62, 66, 70, 74, 79, 84, 88, 92, 96, 100};
@@ -1561,6 +1626,7 @@ class Player {
     private String previousRoom;
     private final ArrayList<Item> inventory;
 
+    // PURPOSE: Constructs a level 1 player, granting them a stick and their initial stat arrays.
     public Player(String name) {
         this.name = name;
         this.level = 1;
@@ -1580,6 +1646,7 @@ class Player {
     public boolean isAlive() { return hp > 0; }
     public void addXp(int amount) { xp += amount; }
 
+    // PURPOSE: Scans XP thresholds. If met, increments level and scales max stats accordingly.
     public void checkLevelUp() {
         while (level < HP_BY_LEVEL.length && xp >= XP_THRESHOLDS[level]) {
             level++;
@@ -1595,17 +1662,19 @@ class Player {
     public void addItem(Item item) { inventory.add(item); }
     public void removeItem(int index) { inventory.remove(index); }
     
+    // PURPOSE: Boolean check to see if an item by string name exists within the inventory array.
     public boolean hasItem(String itemName) {
         for (Item item : inventory) { if (item.getName().equalsIgnoreCase(itemName)) return true; }
         return false;
     }
 
-    // NEW LOGIC: Checks the main inventory for keys instead of a separate list
+    // PURPOSE: Boolean check to see if *any* object instanced as KeyItem exists in the inventory.
     public boolean hasAnyKey() { 
         for (Item item : inventory) { if (item instanceof KeyItem) return true; }
         return false; 
     }
     
+    // PURPOSE: Boolean check to see if a specific key by keyId exists in the inventory.
     public boolean hasKey(String keyId) {
         for (Item item : inventory) { 
             if (item instanceof KeyItem key && key.getKeyId().equalsIgnoreCase(keyId)) return true; 
@@ -1628,10 +1697,16 @@ class Player {
     public ArrayList<Item> getInventory() { return inventory; }
 }
 
+// [TAG: SECTION_6 ] - Vessel of Stone (Room State)
 /* =========================================================================================
-   PILLAR 6: THE VESSEL OF STONE (Room State)
+   The map node class. Holds all states relating to a physical location, including 
+   uncollected loot, untriggered puzzles, and undefeated enemies.
    ========================================================================================= */
 
+/**
+ * A Room object acts as a node in the navigation map. It uses Composition to 
+ * hold an Enemy object and Aggregation to hold Lists of Items.
+ */
 class Room {
     private final String id;
     private final String name;
@@ -1651,6 +1726,7 @@ class Room {
     private boolean hasCat;
     private boolean catResolved;
 
+    // PURPOSE: Constructs a baseline room and sets its identity flags for the WorldBuilder.
     public Room(String id, String name, String description, boolean preLock, boolean keyEligible) {
         this.id = id;
         this.name = name;
@@ -1677,9 +1753,12 @@ class Room {
 
     public String getId() { return id; }
     public String getName() { return name; }
+    
+    // PURPOSE: Dynamically alters the descriptive text if the room's threat/puzzle has been resolved.
     public String getDisplayDescription() { return hasBeenCleared() ? clearedDescription : description; }
     public void setClearedDescription(String clearedDescription) { this.clearedDescription = clearedDescription; }
 
+    // PURPOSE: Master flag check to see if a room's obstacle (enemy, puzzle, or loot) has been neutralized.
     public boolean hasBeenCleared() {
         if (hasEnemy() && enemy.isDefeated()) return true;
         if (isPuzzleRoom() && puzzleSolved) return true;
@@ -1710,10 +1789,14 @@ class Room {
     public void setCatResolved(boolean catResolved) { this.catResolved = catResolved; }
 }
 
+// [TAG: SECTION_7 ] - Master Reliquary (Items)
 /* =========================================================================================
-   PILLAR 7: THE MASTER RELIQUARY (Items)
+   This architecture dictates what every item IS (Item -> GameItem) and what it DOES (Usable).
    ========================================================================================= */
 
+/**
+ * A static factory containing instantiation methods for every physical item in the game.
+ */
 final class Items {
 
     private Items() {}
@@ -1738,6 +1821,7 @@ final class Items {
     public static KeyItem ancientRelic() { return new KeyItem("dragon_lair_secret_door", "Ancient Relic"); }
     public static CatItem cat() { return new CatItem(); }
 
+    // PURPOSE: Sums up all Attack bonuses from equipped gear.
     public static int getPassiveAttackBonus(Player player) {
         int total = 0;
         for (Item item : player.getInventory()) {
@@ -1746,19 +1830,18 @@ final class Items {
         return total;
     }
 
+    // PURPOSE: Evaluates the highest shielding gear and armor worn by the player, summing them.
     public static int getPassiveDefenseBonus(Player player) {
         int highestArmor = 0;
         int highestShield = 0;
         
         for (Item item : player.getInventory()) {
             if (item instanceof PassiveGearItem gear) {
-                // The True Name of a Shield is revealed if it grants parry
                 if (gear.grantsParry()) { 
                     if (gear.getPassiveDefenseBonus() > highestShield) {
                         highestShield = gear.getPassiveDefenseBonus();
                     }
                 } else { 
-                    // Otherwise, it is worn Armor
                     if (gear.getPassiveDefenseBonus() > highestArmor) {
                         highestArmor = gear.getPassiveDefenseBonus();
                     }
@@ -1768,8 +1851,10 @@ final class Items {
         return highestArmor + highestShield;
     }
 
+    // PURPOSE: Short-hand check if player holds a specific item for dark room vision.
     public static boolean playerHasTorch(Player player) { return player.hasItem("Torch"); }
 
+    // PURPOSE: Returns a reference to a weapon if it exists in the player's pack.
     public static WeaponItem findWeapon(Player player, String weaponName) {
         for (Item item : player.getInventory()) {
             if (item instanceof WeaponItem weapon && item.getName().equalsIgnoreCase(weaponName)) return weapon;
@@ -1778,10 +1863,15 @@ final class Items {
     }
 }
 
+/**
+ * The base physical item class. Purely informational representation of a thing.
+ */
 class Item {
     private final String name;
     private final ItemType type;
     private final int power;
+    
+    // PURPOSE: Constructs a generic item.
     public Item(String name, ItemType type, int power) { this.name = name; this.type = type; this.power = power; }
     public String getName() { return name; }
     public ItemType getType() { return type; }
@@ -1791,6 +1881,9 @@ class Item {
 
 enum ItemType { HEALING, WEAPON, SPECIAL }
 
+/**
+ * An envelope class to pass contextual data to an item's use() method.
+ */
 class ItemContext {
     private boolean inBattle;
     private Enemy currentEnemy;
@@ -1815,10 +1908,29 @@ class ItemContext {
     public void setEncounterBypassed(boolean encounterBypassed) { this.encounterBypassed = encounterBypassed; }
 }
 
-abstract class GameItem extends Item {
+// PROFESSOR REQUIREMENT: Interface Implementation
+/**
+ * Interface that formalizes the contract of usability.
+ * Separates the behavior of 'using' a thing from the 'physical matter' of an Item.
+ */
+interface Usable {
+    boolean canUseInBattle();
+    boolean canUseOutsideBattle();
+    boolean use(Player player, ItemContext context);
+}
+
+/**
+ * An abstract GameItem dictating an object is physically present in the game world, 
+ * possessing a description, and adhering to the Usable behavior contract.
+ */
+abstract class GameItem extends Item implements Usable {
     private final String description;
+    
+    // PURPOSE: Constructs the base GameItem.
     public GameItem(String name, ItemType type, int power, String description) { super(name, type, power); this.description = description; }
     public String getDescription() { return description; }
+    
+    // PURPOSE: The default behavior for these methods dictates inertness unless overridden.
     public boolean canUseInBattle() { return false; }
     public boolean canUseOutsideBattle() { return false; }
     public boolean isPassive() { return false; }
@@ -1829,9 +1941,14 @@ abstract class GameItem extends Item {
     @Override public String toString() { return getName() + " - " + description; }
 }
 
+/**
+ * Abstract sub-class for offensive armaments. Overrides specific damage/accuracy algorithms.
+ */
 abstract class WeaponItem extends GameItem {
     private final int accuracy;
     private final String attackName;
+    
+    // PURPOSE: Pre-constructs the type to WEAPON for the hierarchy.
     public WeaponItem(String name, int power, int accuracy, String attackName, String description) {
         super(name, ItemType.WEAPON, power, description);
         this.accuracy = accuracy;
@@ -1839,6 +1956,8 @@ abstract class WeaponItem extends GameItem {
     }
     public int getAccuracy() { return accuracy; }
     public String getAttackName() { return attackName; }
+    
+    // PURPOSE: Uses the specific weapon's stats against an enemy's defense rating to establish damage.
     public int getDamageAgainst(Enemy enemy, Player player) {
         if (enemy == null) return Math.max(1, getPower());
         return Math.max(1, getPower() + player.getAttack() - enemy.getDefense());
@@ -1846,10 +1965,15 @@ abstract class WeaponItem extends GameItem {
     public boolean allowsDarkRoomEntry() { return false; }
 }
 
+/**
+ * Abstract sub-class for worn items. These are inert/un-usable, providing passive boons.
+ */
 abstract class PassiveGearItem extends GameItem {
     private final int passiveAttackBonus;
     private final int passiveDefenseBonus;
     private final boolean parryEnabled;
+    
+    // PURPOSE: Constructors setting up static defensive blocks.
     public PassiveGearItem(String name, String description, int passiveAttackBonus, int passiveDefenseBonus, boolean parryEnabled) {
         super(name, ItemType.SPECIAL, 0, description);
         this.passiveAttackBonus = passiveAttackBonus;
@@ -1861,6 +1985,8 @@ abstract class PassiveGearItem extends GameItem {
     @Override public int getPassiveDefenseBonus() { return passiveDefenseBonus; }
     @Override public boolean grantsParry() { return parryEnabled; }
 }
+
+// ----------------- CONCRETE ITEM CLASSES (Usable override instances) ----------------- //
 
 class SmallPotionItem extends GameItem {
     public SmallPotionItem() { super("Small Potion", ItemType.HEALING, 15, "Heals 15 HP. Can be used in or out of battle."); }
@@ -2043,15 +2169,20 @@ class CatItem extends GameItem {
     }
 }
 
+// [TAG: SECTION_8 ] - Monster Factory (Bestiary)
 /* =========================================================================================
-   PILLAR 8: THE MONSTER FACTORY (Bestiary)
+   Generates Enemy objects, detailing their moves, health, defenses, and rewards.
    ========================================================================================= */
 
+/**
+ * A static factory containing all enemy definitions to keep the WorldBuilder clean.
+ */
 final class Bestiary {
     private static final Random random = new Random();
 
     private Bestiary() {}
 
+    // PURPOSE: Constructors for individual enemy types providing scaling challenges.
     public static Enemy bat() {
         return new Enemy(EnemyType.BAT, "Bats", 20, 4, 1, 7, randomGold(2, 8),
                 new EnemyMove("Bite", 1, 84, MoveType.LIGHT, false, MoveEffect.NONE, 0, 0),
@@ -2143,11 +2274,15 @@ final class Bestiary {
                 new EnemyMove("Claw", 5, 70, MoveType.NORMAL, true, MoveEffect.NONE, 0, 0));
     }
 
+    // PURPOSE: Localizes the gold dropping logic for monsters.
     private static int randomGold(int min, int max) {
         return min + random.nextInt(max - min + 1);
     }
 }
 
+/**
+ * Concrete representation of an active threat in a room. Manages health and turn options.
+ */
 class Enemy {
     private final EnemyType type;
     private final String name;
@@ -2156,6 +2291,7 @@ class Enemy {
     private int hp;
     private boolean defeated;
 
+    // PURPOSE: Constructs an enemy and populates its internal array of possible attacks.
     public Enemy(EnemyType type, String name, int hp, int attack, int defense, int xpReward, int goldReward, EnemyMove... moves) {
         this.type = type; this.name = name; this.maxHp = hp; this.hp = hp;
         this.attack = attack; this.defense = defense; this.xpReward = xpReward; this.goldReward = goldReward;
@@ -2181,6 +2317,9 @@ class Enemy {
     public void setDefeated(boolean defeated) { this.defeated = defeated; }
 }
 
+/**
+ * The blueprint for an attack utilized by an enemy. Holds logic for damage type and side-effects.
+ */
 class EnemyMove {
     private final String name;
     private final int power, accuracy, effectChance, effectPower;
@@ -2188,6 +2327,7 @@ class EnemyMove {
     private final boolean parryable;
     private final MoveEffect effect;
 
+    // PURPOSE: Constructs an enemy move, defining if it triggers a status effect or is blockable.
     public EnemyMove(String name, int power, int accuracy, MoveType moveType, boolean parryable, MoveEffect effect, int effectChance, int effectPower) {
         this.name = name; this.power = power; this.accuracy = accuracy;
         this.moveType = moveType; this.parryable = parryable;
@@ -2208,18 +2348,23 @@ enum EnemyType { BAT, GOBLIN, WOLF, SLIME, SKELETON, ORC, OGRE, CAVE_TROLL, SNAK
 enum MoveType { LIGHT, NORMAL, HEAVY, GRAPPLE, STATUS, MAGIC }
 enum MoveEffect { NONE, POCKET_SAND, CONSTRICT, SELF_HEAL, SOUL_DRAIN }
 
-
+// [TAG: SECTION_9 ] - Broker of Souls (MerchantManager)
 /* =========================================================================================
-   PILLAR 9: THE BROKER OF SOULS (MerchantManager)
+   Handles logic for the in-game economy, allowing the player to convert gold to items 
+   and vice versa, tracking depleted stock.
    ========================================================================================= */
 
+/**
+ * Handles interactions with the Goblin Merchant, processing transactions and inventory management.
+ */
 class MerchantManager {
     // The Merchant's memory of unique items sold
     private final Set<String> depletedStock = new HashSet<>();
 
+    // PURPOSE: Serves as the primary entry point for opening the merchant interaction sequence.
     public void handleMerchant(Player player, Room room) {
         System.out.println("\n--- THE WANDERING BAZAAR ---");
-        ImageGallery.reveal("Goblin"); // <-- TENTH PILLAR HOOK
+        ImageGallery.reveal("Goblin"); 
         System.out.println("The Goblin grins, revealing a mouth of jagged, golden teeth.");
         System.out.println("\"Ah, a traveler! I have many shiny things... Or perhaps you have shiny things for me?\"");
         
@@ -2244,20 +2389,18 @@ class MerchantManager {
         }
     }
     
+    // PURPOSE: Spawns items dynamically and processes gold subtractions.
     private void buyMenu(Player player, Room room) {
         boolean isFloor3 = room.getId().startsWith("f3");
         
         while (true) {
-            // We summon the wares anew each loop so depleted items vanish
             List<GameItem> wares = new ArrayList<>();
             List<Integer> prices = new ArrayList<>();
             
-            // Consumables and magic are infinite
             wares.add((GameItem) Items.smallPotion()); prices.add(20);
             wares.add((GameItem) Items.torch());       prices.add(15);
             wares.add((GameItem) Items.scrollOfEscape()); prices.add(30);
             
-            // Steel and wood are finite
             if (!depletedStock.contains("Sword")) { wares.add((GameItem) Items.sword()); prices.add(40); }
             if (!depletedStock.contains("Shield")) { wares.add((GameItem) Items.shield()); prices.add(50); }
             
@@ -2278,6 +2421,7 @@ class MerchantManager {
             String answer = DarkHolds.input.nextLine().trim();
             if (answer.equals("0")) break;
             
+            // PROFESSOR REQUIREMENT: Exception Handling preventing crash on bad merchant input.
             try {
                 int choice = Integer.parseInt(answer) - 1;
                 if (choice >= 0 && choice < wares.size()) {
@@ -2288,7 +2432,6 @@ class MerchantManager {
                         player.addItem(boughtItem);
                         System.out.println("You bought the " + boughtItem.getName() + " for " + cost + " gold.");
                         
-                        // If it is a unique relic (weapon or armor), the Goblin exhausts his supply
                         if (boughtItem instanceof WeaponItem || boughtItem instanceof PassiveGearItem) {
                             depletedStock.add(boughtItem.getName());
                         }
@@ -2304,6 +2447,7 @@ class MerchantManager {
         }
     }
     
+    // PURPOSE: Calculates raw value of player inventory items and processes gold addition/item deletion.
     private void sellMenu(Player player) {
         while (true) {
             System.out.println("\n--- SELL ---");
@@ -2327,6 +2471,7 @@ class MerchantManager {
             String answer = DarkHolds.input.nextLine().trim();
             if (answer.equals("0")) break;
             
+            // PROFESSOR REQUIREMENT: Exception Handling preventing crash on bad merchant input.
             try {
                 int choice = Integer.parseInt(answer) - 1;
                 if (choice >= 0 && choice < player.getInventory().size()) {
@@ -2357,6 +2502,7 @@ class MerchantManager {
         }
     }
     
+    // PURPOSE: The hardcoded appraisal values for every item type.
     private int getSellValue(Item item) {
         String name = item.getName().toLowerCase();
         if (name.contains("stick") || item instanceof KeyItem) return 0;
@@ -2372,10 +2518,15 @@ class MerchantManager {
     }
 }
 
+// [TAG: SECTION_10 ] - Phantom Gallery (ImageGallery)
 /* =========================================================================================
-   PILLAR 10: THE PHANTOM GALLERY (ImageGallery)
+   Stores massive multiline ASCII strings separated from the main code. 
+   Outputs terminal art via static lookups to preserve class cleanliness.
    ========================================================================================= */
 
+/**
+ * A utility database to serve ASCII graphical elements when an entity's True Name is invoked.
+ */
 class ImageGallery {
     private static final Map<String, String> gallery = new HashMap<>();
 
@@ -2387,18 +2538,18 @@ class ImageGallery {
 (  @  @ )   / ,-'
  \\\\  _T_/-._( (
  /         `. \\\\
-|         _  \\\\ |
+|          _  \\\\ |
  \\\\ \\\\ ,  /      |
   || |-_\\\\__   /
  ((_/`(____,-'
 """);
 
         gallery.put("Goblin", """
-         ,      ,
-       /(.-""-.)\\
+          ,      ,
+      /(.-""-.)\\
  |\\  \\/     \\/   /|
  | \\ / =.  .= \\  / |
-  \\ \\  o\\/o  \\/  /
+  \\ \\    o\\/o  \\/  /
    \\_, '-/  \\-' ,_/
      /   \\__/   \\
      \\ \\__/\\__/ /
@@ -2414,7 +2565,7 @@ class ImageGallery {
               .::  [  o  o  ]  ::.
               :::.  \\  --  /  .:::
               '::::. '----' .::::'
-             ___/::::::::::::::\\___
+              ___/::::::::::::::\\___
           .-'  |     ######     |  '-.
          /    / \\    ######    / \\  \\
         |    |   \\   ######   /   |    |
@@ -2423,130 +2574,140 @@ class ImageGallery {
         |    |      \\######/      |    |
          \\    \\      '----'      /    /
           '-._ \\       ||||      / _.-'
-              \\ \\     ||||     / /
-               \\ \\    ||||    / /
-                \\_\\  /####\\  /_/
-                [###|      |###]
-                '---'      '---'
+               \\ \\     ||||     / /
+                \\ \\    ||||    / /
+                 \\_\\  /####\\  /_/
+                 [###|      |###]
+                 '---'      '---'
 """);
 
         gallery.put("Skeleton", """
-              :.                
-             :#*=:              
-     :=.      +-#.              
-     -%=.  ..-=#+.==:           
-      =-  -+#%%#+#+:=-          
-       *-.  #@%=++++*=          
-       ..   %@#++#+:+.          
-            +*=@-+-:=           
-            .:.%..  =.          
-            -@%%#@* :          
-            :%@%#%=  .:         
-           -##-:::+: .-:        
-           :-#    := .%=        
-           +.=     +  =+        
-          --       =.  ::       
-         -=:       -* -.=.      
-         +-        .* #- *-+    
-        .+          # =@#*+     
-        =-          #  -:       
-      ..#.           :@#:         
-      :** .:=-        
-     :##=                       
-     .+=   
+               :.                
+              :#*=:              
+      :=.      +-#.              
+      -%=.  ..-=#+.==:           
+       =-  -+#%%#+#+:=-          
+        *-.  #@%=++++*=          
+        ..   %@#++#+:+.          
+             +*=@-+-:=           
+             .:.%..  =.          
+             -@%%#@* :           
+             :%@%#%=  .:         
+            -##-:::+: .-:        
+            :-#    := .%=        
+            +.=     +  =+        
+           --       =.  ::       
+          -=:       -* -.=.      
+          +-        .* #- *-+    
+         .+          # =@#*+     
+         =-          #  -:       
+       ..#.           :@#:       
+       :** .:=-        
+      :##=                       
+      .+=   
 """);
 
         gallery.put("Bats", """
-        /\\                 /\\
-       / \\'._  (\\_/)   _.'/ \\
-      /_.''._'--('.')--'_.''._\\
-      | \\_ / `;=/ " \\=;` \\ _/ |
-       \\/ `\\__|`\\___/`|__/`\\/
-               \\(/|\\)/
+         /\\                 /\\
+        / \\'._  (\\_/)   _.'/ \\
+       /_.''._'--('.')--'_.''._\\
+       | \\_ / `;=/ " \\=;` \\ _/ |
+        \\/ `\\__|`\\___/`|__/`\\/
+                \\(/|\\)/
 """);
 
         gallery.put("Ogre", """
             .=-::.              
           .+%+:.=*: ..          
         :-#@@%*+=#=-:..         
-       :*=#@@%**#%+-.::...      
-      .+%%%%@@@%#=::**---::     
-    .==%*@%++*%+:::+@@+-*--=    
-    -*=*%%  ##***+-+*@==%+=+    
-    :++*=.  #%#+****##* .+-=    
-   .+*=    .%@%%%%@@*=*-=*--:   
-  .+*+*-   =@@@%##%%++#*-+*** .=%@@:    #%%         
-       :+*##*###=--+%%%%+: 
+        :*=#@@%**#%+-.::...      
+       .+%%%%@@@%#=::**---::     
+     .==%*@%++*%+:::+@@+-*--=    
+     -*=*%%  ##***+-+*@==%+=+    
+     :++*=.  #%#+****##* .+-=    
+    .+*=    .%@%%%%@@*=*-=*--:   
+   .+*+*-   =@@@%##%%++#*-+*** 
+           .=%@@:    #%%         
+        :+*##*###=--+%%%%+: 
 """);
 
         gallery.put("Orc", """
-                 .--:           
-              .::-+++::         
-               =+#%#@#+         
-              .+#%@@@@@*:       
-             =#@@@@@.@%+=-.     
-            :#%%%%@.%#%%%%#.    
-            -%@@@@@%#@@@@@%%.   
-             *@@%@@%%@@@@@@@+   
-             :%#*@##@@@@*%@%#=  
-              ##*##@@@@:  #@#*- 
-              #@%##%%@@=  #%%%- 
-             .#@@@@@@@@#  -@@@. 
-   -:...     #@@.@%%@..@. -@.=  
-  :@@@@%*+++*@...@%%%@@@=.#..=  
-  +@#=   :  =@...@@@@...##@@@##%
-:*@@=-+*=. :%@..@@@%%%@@@+**.   
--*+#++:.   #@...@@@@@@@@@.      
-          =@.....@%.@..@@+      
-          #.....@*#@.@@@@@.     
-          #....@-=#@%%@...-     
-          %....# +%#*@@...@-    
-          +....#     #.....@    
-          :@..@:     .*......   
-          .@...        %....    
-         :%....        .*..@.   
-        =#%@%* #..=   
-        -=-:             #..%:  
-                         +%%%#. 
-                         .#@%#.
+                  .--:           
+              .::-+++::          
+                =+#%#@#+         
+               .+#%@@@@@*:       
+              =#@@@@@.@%+=-.     
+             :#%%%%@.%#%%%%#.    
+             -%@@@@@%#@@@@@%%.   
+              *@@%@@%%@@@@@@@+   
+              :%#*@##@@@@*%@%#=  
+               ##*##@@@@:  #@#*- 
+               #@%##%%@@=  #%%%- 
+              .#@@@@@@@@#  -@@@. 
+    -:...     #@@.@%%@..@. -@.=  
+   :@@@@%*+++*@...@%%%@@@=.#..=  
+   +@#=   :  =@...@@@@...##@@@##%
+ :*@@=-+*=. :%@..@@@%%%@@@+**.   
+ -*+#++:.   #@...@@@@@@@@@.      
+           =@.....@%.@..@@+      
+           #.....@*#@.@@@@@.     
+           #....@-=#@%%@...-     
+           %....# +%#*@@...@-    
+           +....#     #.....@    
+           :@..@:     .*......   
+           .@...        %....    
+          :%....        .*..@.   
+         =#%@%* #..=   
+         -=-:              #..%:  
+                          +%%%#. 
+                          .#@%#.
 """);
 
         gallery.put("Slime", """
-      _________
-    /           \\
-   /   I    I     \\
-  |               |
-  |               |
-   \\   \\____/    /
-    \\___________/
+         _________
+        /           \\
+       /   I    I     \\
+      |               |
+      |               |
+       \\   \\____/    /
+        \\___________/
 """);
 
         gallery.put("Necromancer", """
-           .. .        .        
-           ..--        -.       
-            +=:      ..==:      
-           +#++      :=*+-      
-        :=*%+-+-      -*-       
-        =*+*#++#+--+-*++        
-       .*@@%%%#+=%#*-:::        
-       ++*@#@*#: =*=  -.        
-       *+=%%%#** .*:  =         
-       *:-*@@%#@  +   * =*#@%##%#     -         
-      -#%@%%%*@%=   .:         
-    .+#@@@#%@##%#:  =:         
-      .:-=-:.:.  
+                    ____ 
+                  .'* *.'
+               __/_*_*(_
+              / _______ \\
+             _\\_)/___\\(_/_
+            / _((\\- -/))_ \\
+            \\ \\())(-)(()/ /
+             ' \\(((()))/ '
+            / ' \\)).))/ ' \\
+           / _ \\ - | - /_  \\
+          (   ( .;''';. .'  )
+          _\\\"__ /    )\\ __\"/_
+            \\/  \\   ' /  \\/
+             .'  '...' ' )
+              / /  |  \\ \\
+             / .   .   . \\
+            /   .     .   \\
+           /   /   |   \\   \\
+         .'   /    b    '.  '.
+     _.-'    /     Bb     '-. '-._ 
+ _.-'       |      BBb       '-.  '-. 
+(___________\\____.dBBBb.________)____)
 """);
 
         gallery.put("Giant Snake", """
-           ____
-          /  __\\
-          | /
-          | |
-   _______| |
-  /  _______|
- /  /
- \\  \\__
-  \\____\\
+            ____
+           /  __\\
+           | /
+           | |
+    _______| |
+   /  _______|
+  /  /
+  \\  \\__
+   \\____\\
 """);
 
         gallery.put("Iron Key", """
@@ -2556,166 +2717,169 @@ O--====--++--
         gallery.put("Ancient Relic", gallery.get("Iron Key"));
 
         gallery.put("Small Potion", """
-       _|_
-      |___|
-     / ~ ~ \\
-    |___*___|
-    \\_____/
+        _|_
+       |___|
+      / ~ ~ \\
+     |___*___|
+      \\_____/
 """);
         gallery.put("Big Potion", gallery.get("Small Potion"));
 
         gallery.put("Scroll of Escape", """
-       _________
-      /        /
+         _________
+        /        /
+       /        /
+      / '' ''  /
      /        /
-    / '' ''  /
-   /        /
-  /________/
+    /________/
 """);
 
         gallery.put("Stick", """
-         |
-         | /
-         |/
-      \\ |
-       \\|
-         |
+          |
+          | /
+          |/
+       \\ |
+        \\|
+          |
 """);
 
         gallery.put("Sword", """
-         /\\
-        /  \\
-        ||||
-        ||||
-        ||||
-        ||||
-        ||||
-        ||||
-       /____\\
-         ||
-         ||
+          /\\
+         /  \\
+         ||||
+         ||||
+         ||||
+         ||||
+         ||||
+         ||||
+        /____\\
+          ||
+          ||
 """);
         gallery.put("Great Sword", gallery.get("Sword"));
 
         gallery.put("Armor", """
-               .=*=       
-      --+#%@@@*+=+#*.     
-    -*%@%%%%%#*:..-*#=    
-   -%###*#####*++-=+*#-   
-   *%###*+++#%%##*#*--*:  
-  -%@#%#*++#*+*##%@#++##: 
- .%@.%##**%*++**%@@@#%##*:
- -@@@@%##@*==##%@@+.#@%#%%
- #@@@###%%**+%%%@@-  +@%%@
-=@@@% =@@%%%#%@@@@:  -#==+
-%%@@= =@@@@@%@@@@@.  -*==#
-%@@* *@@@@@%@@@@@-  -%*#+
-%@#  :@%@%%#####*#+  :%#@:
-%%-  #@%@@#**####%%- :@%# 
-@#: .@@%@@@#*###%%%#*#%%= 
-**. -@@%%%@#++++***#+-%#: 
-    =%@@=.%@@%@@@@%*-+#-  
-          .:::..    .:. 
+                .=*=       
+       --+#%@@@*+=+#*.     
+     -*%@%%%%%#*:..-*#=    
+    -%###*#####*++-=+*#-   
+    *%###*+++#%%##*#*--*:  
+   -%@#%#*++#*+*##%@#++##: 
+  .%@.%##**%*++**%@@@#%##*:
+  -@@@@%##@*==##%@@+.#@%#%%
+  #@@@###%%**+%%%@@-  +@%%@
+ =@@@% =@@%%%#%@@@@:  -#==+
+ %%@@= =@@@@@%@@@@@.  -*==#
+ %@* *@@@@@%@@@@@-  -%*#+
+ %@#  :@%@%%#####*#+  :%#@:
+ %%-  #@%@@#**####%%- :@%# 
+ @#: .@@%@@@#*###%%%#*#%%= 
+ **. -@@%%%@#++++***#+-%#: 
+     =%@@=.%@@%@@@@%*-+#-  
+           .:::..    .:. 
 """);
         gallery.put("Decayed Armor", gallery.get("Armor"));
 
         gallery.put("Shield", """
-       _______
-      /       \\
-     /         \\
-    |   _____   |
-    |  |     |  |
-    |  |_____|  |
-    \\         /
-     \\_______/
+        _______
+       /       \\
+      /         \\
+     |   _____   |
+     |  |     |  |
+     |  |_____|  |
+      \\         /
+       \\_______/
 """);
         gallery.put("Dragon Scale Shield", gallery.get("Shield"));
 
         gallery.put("Torch", """
-         ( )
-        (   )
-        \\_//
-          |
-          |
-          |
-          |
+          ( )
+         ( _ )
+          \\_/
+           |
+           |
+           |
+           |
 """);
 
         gallery.put("Scroll of Fireball", """
-       _________
-      /        /
-     / ( )    /
-    / (   )  /
-   /  \\_/  /
-  /________/
+         _________
+        /        /
+       / ( )    /
+      / (   )  /
+     /  \\_/  /
+    /________/
 """);
 
         String blankScroll = """
-       _________
+         _________
+        /        /
+       /        /
       /        /
      /        /
-    /        /
-   /        /
-  /________/
+    /________/
 """;
         gallery.put("Scroll of Stealth", blankScroll);
         gallery.put("Scroll of Life Steal", blankScroll);
         gallery.put("Scroll of Level Up", blankScroll);
         
         gallery.put("Golem", """
-             :.                 
-          :+%*+::- ::.          
-      .+*+*@@@*-*@*%+=:.        
-      %%%%#%%###=-:-##+-:.      
-     -@@@@@##+*#+=-:+@%#+=      
-    =@@%@.@@@%**#*++@.%+-.=..   
-  :+@@@@@.%%@@%#%#=*@=@@#*+*:   
- :%*#@@..* #.@%#%%@=  @@@*-:.. 
- %%#*%%@.: +@@@%*+@*-. +@%*#*+- 
-.@@%#%@@= =%#%@@%*%#*+ :#%*.-+* :@%*%%+ .@%*+:   #@%#- *#@@#.  
-  =%@%*: :@%*+* :@@%#=.  .     
-         -@%%#%  .@.@%*:        
-         :@#%%* +@@#=.        
-       .++*+:-* #%=-+:.       
-       ++=#=--=   +@*:*#=: 
+               :.                 
+            :+%*+::- ::.          
+       .+*+*@@@*-*@*%+=:.        
+       %%%%#%%###=-:-##+-:.      
+      -@@@@@##+*#+=-:+@%#+=      
+     =@@%@.@@@%**#*++@.%+-.=..   
+   :+@@@@@.%%@@%#%#=*@=@@#*+*:   
+  :%*#@@..* #.@%#%%@=  @@@*-:.. 
+  %%#*%%@.: +@@@%*+@*-. +@%*#*+- 
+ .@@%#%@@= =%#%@@%*%#*+ :#%*.-+* 
+  :@%*%%+ .@%*+:   #@%#- *#@@#.   
+   =%@%*: :@%*+* :@@%#=.  .      
+          -@%%#%  .@.@%*:        
+          :@#%%* +@@#=.        
+        .++*+:-* #%=-+:.       
+        ++=#=--=   +@*:*#=: 
 """);
 
         gallery.put("Mimic", """
                                               
                                               
                                               
-     ..:-----::-++*#+-::-=+:                  
-   .=***=#@%##%%%%%%@%%%@@%##+-               
-  .+###**-%@####%#**###%#%%@@#%-              
-  +##****++%@%**++#-+#-*:+#+%##+              
- :*#*****=-*%%%=+==*:+:*+#*+*#**:             
- .*####*=+%@@@@#:%:+**%@@@@@%##@-      :::    
-  :+#*++#%@.@@#-=%@%...@@@@@%##:       +:=+.  
-   -**%@%*%@@#*%.....@@@%####+=.       .+-##  
-   :*@@@#**%@@.@#...@@@@%%####**=       .**%- 
-   .-***+==--+#*++*+%@@@@@@@@%##%*:      :#%* +#%#****-*@@###=%*#=##*@@%*%**+=+*+=+*%@. 
-    =*###***:*@@@%%@%%@%@@@@@@@%: :=**###%*.  
-    +*#****+:#@%%@@@@@@@@@@@@@@@:      ..     
-    =*###**+:%@%%%%%@@@%@@@@@@@@:
-    +*####*+:%@%%%@@@%##%@@@@@@@=
-   .+#####*+-@@@@@@@#***#%@@@@@#*.
-   =***++==-=@@@@@@%#*+*#%@..@@@@@@@%*=.
-    ...:::::+**++++=====---::::...
+      ..:-----::-++*#+-::-=+:                  
+    .=***=#@%##%%%%%%@%%%@@%##+-               
+   .+###**-%@####%#**###%#%%@@#%-              
+   +##****++%@%**++#-+#-*:+#+%##+              
+  :*#*****=-*%%%=+==*:+:*+#*+*#**:             
+  .*####*=+%@@@@#:%:+**%@@@@@%##@-      :::    
+   :+#*++#%@.@@#-=%@%...@@@@@%##:       +:=+.  
+    -**%@%*%@@#*%.....@@@%####+=.       .+-##  
+    :*@@@#**%@@.@#...@@@@%%####**=       .**%- 
+    .-***+==--+#*++*+%@@@@@@@@%##%*:      :#%* 
+      +#%#****-*@@###=%*#=##*@@%*%**+=+*+=+*%@. 
+     =*###***:*@@@%%@%%@%@@@@@@@%: :=**###%*.  
+     +*#****+:#@%%@@@@@@@@@@@@@@@:      ..     
+     =*###**+:%@%%%%%@@@%@@@@@@@@:
+     +*####*+:%@%%%@@@%##%@@@@@@@=
+    .+#####*+-@@@@@@@#***#%@@@@@#*.
+    =***++==-=@@@@@@%#*+*#%@..@@@@@@@%*=.
+     ...:::::+**++++=====---::::...
 """);
 
         gallery.put("Dragon", """
-                               
-                     *++++=-:  
-   .:-=+***.        :#*#*++=-. 
+                                
+                      *++++=-:  
+    .:-=+***.        :#*#*++=-. 
  :-++++*+*+*+:.::.-*%*+=*-:.   
-     ----+=:-*=+#%@#*-.::=     
-        :.    .+#@%#.          
-               -.*++#-         
-                 .   :-:.      
-                               
+      ----+=:-*=+#%@#*-.::=     
+         :.    .+#@%#.          
+                -.*++#-         
+                  .   :-:.      
+                                
 """);
     }
 
+    // PURPOSE: Accesses the internal dictionary to print the relevant ASCII art to the console.
     public static void reveal(String trueName) {
         if (gallery.containsKey(trueName)) {
             System.out.println(gallery.get(trueName));
